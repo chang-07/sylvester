@@ -17,7 +17,11 @@ struct MenuView: View {
             case .needsConfig(let message):
                 setupView(message)
             case .ready:
-                readyView
+                if state.showSetup {
+                    setupView("")
+                } else {
+                    readyView
+                }
             }
         }
         .frame(width: 340)
@@ -93,6 +97,10 @@ struct MenuView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(state.setupBusy || setupClientId.isEmpty || setupConsumerKey.isEmpty)
+
+                if case .ready = state.phase {
+                    Button("Cancel") { state.showSetup = false }
+                }
 
                 Spacer()
                 Menu {
@@ -223,11 +231,27 @@ struct MenuView: View {
                     groupView(group)
                 }
                 if state.groups.isEmpty && state.attentionConnections.isEmpty && !state.isRefreshing {
-                    Text("No accounts yet — connect one below.")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .padding(.vertical, 12)
-                        .frame(maxWidth: .infinity, alignment: .center)
+                    VStack(spacing: 8) {
+                        Image(systemName: "building.columns")
+                            .font(.system(size: 26))
+                            .foregroundStyle(.quaternary)
+                        Text("Keys are set — now link a brokerage")
+                            .font(.callout.weight(.medium))
+                        Text("The SnapTrade connection portal opens in your browser; accounts appear here after the first sync.")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                            .multilineTextAlignment(.center)
+                        Button {
+                            Task { await state.connectAccount() }
+                        } label: {
+                            Label("Connect Your First Account", systemImage: "plus.circle.fill")
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                    }
+                    .padding(.vertical, 14)
+                    .padding(.horizontal, 8)
+                    .frame(maxWidth: .infinity, alignment: .center)
                 }
             }
             .padding(.horizontal, 12)
@@ -334,7 +358,7 @@ struct MenuView: View {
     private var listHeight: CGFloat {
         let accountCount = state.groups.reduce(0) { $0 + $1.accounts.count }
         let attentionCount = state.attentionConnections.count
-        guard accountCount + attentionCount > 0 else { return 60 }
+        guard accountCount + attentionCount > 0 else { return 170 }
         var height = CGFloat(state.groups.count) * 26 + CGFloat(accountCount) * 38
             + CGFloat(attentionCount) * 40 + 20
         for group in state.groups {
@@ -547,6 +571,7 @@ struct MenuView: View {
             Menu {
                 Button(state.privacyMode ? "Show Amounts" : "Hide Amounts") { state.privacyMode.toggle() }
                 Divider()
+                Button("Edit API Keys…") { state.showSetup = true }
                 Button("Open Config") { state.openConfig() }
                 Button("Reload Config") { state.reloadConfig() }
                 if !state.secretsInKeychain {

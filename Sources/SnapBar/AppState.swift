@@ -216,6 +216,8 @@ final class AppState: ObservableObject {
     }
 
     @Published var setupBusy = false
+    // Re-opens the key wizard from the ⋯ menu even when already configured (key rotation).
+    @Published var showSetup = false
 
     // Wizard path: validate pasted partner creds, persist (secrets -> keychain),
     // register a user if none supplied, then go live.
@@ -255,6 +257,9 @@ final class AppState: ObservableObject {
             await refresh()
         } else {
             await registerUser()
+        }
+        if case .ready = phase, errorMessage == nil {
+            showSetup = false
         }
     }
 
