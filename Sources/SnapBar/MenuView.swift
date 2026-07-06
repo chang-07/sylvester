@@ -25,29 +25,94 @@ struct MenuView: View {
 
     // MARK: - Setup
 
+    @State private var setupClientId = ""
+    @State private var setupConsumerKey = ""
+    @State private var setupUserId = ""
+    @State private var setupUserSecret = ""
+    @State private var setupAdvanced = false
+
     private func setupView(_ message: String) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label("SnapBar setup", systemImage: "gearshape")
+            Label("Set up SnapBar", systemImage: "gearshape")
                 .font(.headline)
-            Text(message)
-                .font(.callout)
+            Text("Bring your own SnapTrade key — everything stays on this Mac (keys in the Keychain, data pulled directly from the SnapTrade API).")
+                .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+
+            Button {
+                NSWorkspace.shared.open(URL(string: "https://dashboard.snaptrade.com")!)
+            } label: {
+                Label("Get a personal key at dashboard.snaptrade.com", systemImage: "arrow.up.right.square")
+                    .font(.caption)
+            }
+            .buttonStyle(.link)
+
+            VStack(spacing: 6) {
+                TextField("clientId (e.g. YOURNAME-ABCXYZ)", text: $setupClientId)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(.caption, design: .monospaced))
+                SecureField("consumerKey", text: $setupConsumerKey)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(.caption, design: .monospaced))
+            }
+
+            DisclosureGroup("Already have a SnapTrade user? (optional)", isExpanded: $setupAdvanced) {
+                VStack(spacing: 6) {
+                    TextField("userId — blank to auto-register", text: $setupUserId)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(.caption, design: .monospaced))
+                    SecureField("userSecret", text: $setupUserSecret)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(.caption, design: .monospaced))
+                }
+                .padding(.top, 4)
+            }
+            .font(.caption)
+
             if let error = state.errorMessage {
                 errorBanner(error)
             }
+
             HStack {
-                Button("Open Config") { state.openConfig() }
-                Button("Reload") { state.reloadConfig() }
-                if state.config.hasPartnerCreds && !state.config.hasUser {
-                    Button("Register User") { Task { await state.registerUser() } }
-                        .buttonStyle(.borderedProminent)
+                Button {
+                    Task {
+                        await state.completeSetup(
+                            clientId: setupClientId,
+                            consumerKey: setupConsumerKey,
+                            userId: setupUserId,
+                            userSecret: setupUserSecret
+                        )
+                    }
+                } label: {
+                    if state.setupBusy {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Text("Validate & Connect")
+                    }
                 }
+                .buttonStyle(.borderedProminent)
+                .disabled(state.setupBusy || setupClientId.isEmpty || setupConsumerKey.isEmpty)
+
+                Spacer()
+                Menu {
+                    Button("Open Config File") { state.openConfig() }
+                    Button("Reload Config") { state.reloadConfig() }
+                    Divider()
+                    quitButton
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
+                .menuStyle(.borderlessButton)
+                .frame(width: 30)
             }
-            Divider()
-            quitButton
         }
         .padding(12)
+        .onAppear {
+            setupClientId = state.config.clientId
+            setupConsumerKey = state.config.consumerKey
+            setupUserId = state.config.userId
+        }
     }
 
     // MARK: - Main
@@ -484,6 +549,9 @@ struct MenuView: View {
                 Divider()
                 Button("Open Config") { state.openConfig() }
                 Button("Reload Config") { state.reloadConfig() }
+                if !state.secretsInKeychain {
+                    Button("Move Keys to Keychain") { state.moveKeysToKeychain() }
+                }
                 if Notifier.shared.available {
                     Button("Test Notification") {
                         Notifier.shared.post(

@@ -14,13 +14,13 @@ Builds and launches the app bundle — required for macOS notifications (new div
 
 First launch writes a template config to `~/.config/snapbar/config.json` and the menubar item shows setup state.
 
-## Setup
+## Setup (bring your own key)
 
-1. Put your SnapTrade partner `clientId` + `consumerKey` in the config.
-2. Either paste an existing `userId`/`userSecret`, or hit **Register User** in the dropdown (set `userId` in config first to pick the id, otherwise one is generated).
-3. **Connect Account** opens the SnapTrade connection portal in the browser; link brokerages there, then **Refresh**.
+1. Get a personal SnapTrade key at [dashboard.snaptrade.com](https://dashboard.snaptrade.com) — SnapBar is a pure local client; your keys and data never touch anything but your Mac and the SnapTrade API.
+2. Click the menubar item: the setup wizard asks for `clientId` + `consumerKey`, validates them live, and stores secrets in the **macOS Keychain**. A SnapTrade user is auto-registered (or paste an existing `userId`/`userSecret` under the optional disclosure).
+3. **Connect Account** opens the SnapTrade connection portal in the browser; link brokerages there.
 
-Config lives at `~/.config/snapbar/config.json` (chmod 600):
+Non-secret settings live at `~/.config/snapbar/config.json` (chmod 600). Pre-existing configs with inline keys keep working; use ⋯ → **Move Keys to Keychain** to migrate:
 
 - `baseCurrency` — net worth display currency (default `USD`)
 - `refreshMinutes` — auto-refresh cadence (default 15)

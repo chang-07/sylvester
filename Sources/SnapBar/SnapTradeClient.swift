@@ -104,6 +104,12 @@ struct SnapTradeClient {
 
     // MARK: - Endpoints
 
+    // Cheapest partner-scope call — used to validate a pasted clientId/consumerKey pair.
+    func listUsers() async throws -> [String] {
+        let data = try await request(method: "GET", path: "/api/v1/snapTrade/listUsers")
+        return (try? JSONDecoder().decode([String].self, from: data)) ?? []
+    }
+
     func registerUser(userId: String) async throws -> STRegisterUserResponse {
         let data = try await request(
             method: "POST",

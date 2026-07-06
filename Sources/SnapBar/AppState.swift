@@ -215,6 +215,62 @@ final class AppState: ObservableObject {
         NSWorkspace.shared.open(SnapBarConfig.path)
     }
 
+    @Published var setupBusy = false
+
+    // Wizard path: validate pasted partner creds, persist (secrets -> keychain),
+    // register a user if none supplied, then go live.
+    func completeSetup(clientId: String, consumerKey: String, userId: String, userSecret: String) async {
+        let cid = clientId.trimmingCharacters(in: .whitespacesAndNewlines)
+        let key = consumerKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cid.isEmpty, !key.isEmpty else {
+            errorMessage = "clientId and consumerKey are both required."
+            return
+        }
+        setupBusy = true
+        defer { setupBusy = false }
+
+        let probe = SnapTradeClient(clientId: cid, consumerKey: key)
+        do {
+            _ = try await probe.listUsers()
+        } catch {
+            errorMessage = "Key check failed — \(error.localizedDescription)"
+            return
+        }
+
+        config.clientId = cid
+        config.consumerKey = key
+        config.userId = userId.trimmingCharacters(in: .whitespacesAndNewlines)
+        config.userSecret = userSecret.trimmingCharacters(in: .whitespacesAndNewlines)
+        KeychainStore.set("consumerKey", key)   // activates keychain mode before save
+        do {
+            try config.save()
+        } catch {
+            errorMessage = "Couldn't save config: \(error.localizedDescription)"
+            return
+        }
+        errorMessage = nil
+
+        if config.hasUser {
+            phase = .ready
+            await refresh()
+        } else {
+            await registerUser()
+        }
+    }
+
+    func moveKeysToKeychain() {
+        do {
+            try config.moveSecretsToKeychain()
+            errorMessage = nil
+        } catch {
+            errorMessage = "Keychain move failed: \(error.localizedDescription)"
+        }
+    }
+
+    var secretsInKeychain: Bool {
+        KeychainStore.get("consumerKey") != nil
+    }
+
     // MARK: - Actions
 
     func registerUser() async {

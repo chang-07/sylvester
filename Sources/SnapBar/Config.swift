@@ -36,16 +36,38 @@ struct SnapBarConfig: Codable {
         cfg.consumerKey = cfg.consumerKey.trimmingCharacters(in: .whitespacesAndNewlines)
         cfg.userId = cfg.userId.trimmingCharacters(in: .whitespacesAndNewlines)
         cfg.userSecret = cfg.userSecret.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Keychain-mode: secrets live in the keychain, file fields are blank.
+        if cfg.consumerKey.isEmpty, let key = KeychainStore.get("consumerKey") {
+            cfg.consumerKey = key
+        }
+        if cfg.userSecret.isEmpty, let secret = KeychainStore.get("userSecret") {
+            cfg.userSecret = secret
+        }
         return cfg
     }
 
     func save() throws {
         try FileManager.default.createDirectory(at: Self.dir, withIntermediateDirectories: true)
+        var toWrite = self
+        // Once the keychain holds the consumer key, never write secrets back to disk.
+        if KeychainStore.get("consumerKey") != nil {
+            if !consumerKey.isEmpty { KeychainStore.set("consumerKey", consumerKey) }
+            if !userSecret.isEmpty { KeychainStore.set("userSecret", userSecret) }
+            toWrite.consumerKey = ""
+            toWrite.userSecret = ""
+        }
         let enc = JSONEncoder()
         enc.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try enc.encode(self).write(to: Self.path, options: .atomic)
-        // Keys live in this file — keep it owner-readable only.
+        try enc.encode(toWrite).write(to: Self.path, options: .atomic)
+        // Keys may live in this file (non-keychain mode) — keep it owner-readable only.
         try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: Self.path.path)
+    }
+
+    // Switch to keychain mode: move secrets out of the file.
+    func moveSecretsToKeychain() throws {
+        KeychainStore.set("consumerKey", consumerKey)
+        if !userSecret.isEmpty { KeychainStore.set("userSecret", userSecret) }
+        try save()
     }
 
     // Writes a template config if none exists; returns whether one already existed.
