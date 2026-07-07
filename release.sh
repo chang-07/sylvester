@@ -1,6 +1,6 @@
 #!/bin/bash
-# Packages a GitHub-release artifact: a universal (arm64 + x86_64) release .app, zipped with
-# ditto (which preserves the code signature) plus a SHA-256 checksum. The app is ad-hoc signed
+# Packages a GitHub-release artifact: a universal (arm64 + x86_64 when Xcode is present) release
+# .app inside a drag-to-Applications DMG, plus a SHA-256 checksum. The app is ad-hoc signed
 # (no Developer ID), so downloaders must clear quarantine — see the release notes.
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -17,18 +17,22 @@ fi
 APP="dist/SnapBar.app"
 VERSION=$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$APP/Contents/Info.plist")
 ARCHS=$(lipo -archs "$APP/Contents/MacOS/SnapBar" | tr ' ' '+')
-ZIP="dist/SnapBar-$VERSION-macos-$ARCHS.zip"
+DMG="dist/SnapBar-$VERSION-macos-$ARCHS.dmg"
 
 echo "== architectures =="
 lipo -archs "$APP/Contents/MacOS/SnapBar"
 
-echo "== zipping (ditto preserves the signature) =="
-rm -f "$ZIP" "$ZIP.sha256"
-ditto -c -k --keepParent "$APP" "$ZIP"
+echo "== building DMG (drag-to-Applications) =="
+STAGE=$(mktemp -d)
+cp -R "$APP" "$STAGE/"
+ln -s /Applications "$STAGE/Applications"   # drag target inside the mounted volume
+rm -f "$DMG" "$DMG.sha256"
+hdiutil create -volname "SnapBar" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
+rm -rf "$STAGE"
 
 echo "== checksum =="
-shasum -a 256 "$ZIP" | tee "$ZIP.sha256"
+shasum -a 256 "$DMG" | tee "$DMG.sha256"
 
 echo
-echo "Artifact ready: $ZIP"
-ls -lh "$ZIP"
+echo "Artifact ready: $DMG"
+ls -lh "$DMG"
