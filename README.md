@@ -13,17 +13,23 @@
 
 ## Install
 
-Download the latest **`.dmg`** from [Releases](https://github.com/chang-07/snapbar/releases/latest), open it, and drag **SnapBar** to **Applications**.
+**Homebrew** (recommended):
 
-It's ad-hoc signed (not notarized), so clear the download quarantine once:
+```sh
+brew install --cask chang-07/tap/snapbar
+```
+
+Or grab the **`.dmg`** from [Releases](https://github.com/chang-07/snapbar/releases/latest) and drag **SnapBar** to **Applications**.
+
+SnapBar is ad-hoc signed (not notarized), so clear the download quarantine once:
 
 ```sh
 xattr -dr com.apple.quarantine /Applications/SnapBar.app
 ```
 
-Then launch it — the icon appears in your menubar. Requires macOS 14+ (Apple Silicon).
+(or skip it with `HOMEBREW_CASK_OPTS="--no-quarantine" brew install --cask chang-07/tap/snapbar`). Then launch — the icon appears in your menubar. Requires macOS 14+ (Apple Silicon).
 
-Or build from source: `./install.sh` builds and installs to `/Applications`.
+Build from source instead: `./install.sh`.
 
 ## Setup
 
