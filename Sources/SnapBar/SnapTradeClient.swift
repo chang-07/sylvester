@@ -8,9 +8,22 @@ struct SnapTradeError: LocalizedError {
 }
 
 struct SnapTradeClient {
-    var clientId: String
-    var consumerKey: String
+    // Partner keys sign every request (HMAC over clientId/consumerKey); personal keys send
+    // an OAuth bearer token instead, which the server resolves to the single personal user
+    // (no clientId/userId/userSecret/Signature are sent).
+    enum Auth {
+        case partner(clientId: String, consumerKey: String)
+        case bearer(accessToken: String)
+    }
+    var auth: Auth
     var baseURL = URL(string: "https://api.snaptrade.com")!
+
+    init(clientId: String, consumerKey: String) {
+        auth = .partner(clientId: clientId, consumerKey: consumerKey)
+    }
+    init(bearerToken: String) {
+        auth = .bearer(accessToken: bearerToken)
+    }
 
     // MARK: - Signing
     //
@@ -26,7 +39,7 @@ struct SnapTradeClient {
         )
     }
 
-    private func sign(path: String, query: String, content: Any?) throws -> String {
+    private func sign(path: String, query: String, content: Any?, consumerKey: String) throws -> String {
         let sigObject: [String: Any] = [
             "content": content ?? NSNull(),
             "path": path,
@@ -59,23 +72,39 @@ struct SnapTradeClient {
 
     // MARK: - Transport
 
+    // authParams (userId/userSecret) are sent + signed under partner auth, but dropped under
+    // bearer auth (the token resolves the user). queryParams (startDate/limit/…) are always sent.
     private func request(
         method: String,
         path: String,
-        userParams: [(String, String)] = [],
+        authParams: [(String, String)] = [],
+        queryParams: [(String, String)] = [],
         body: [String: Any]? = nil
     ) async throws -> Data {
-        let timestamp = String(Int(Date().timeIntervalSince1970))
-        var params = userParams
-        params.append(("clientId", clientId))
-        params.append(("timestamp", timestamp))
-        let query = queryString(params)
+        var req: URLRequest
 
-        var req = URLRequest(url: URL(string: "\(baseURL.absoluteString)\(path)?\(query)")!)
-        req.httpMethod = method
-        // Server signs falsy bodies as null, so an empty {} must be signed as null too.
-        let signContent: Any? = (body?.isEmpty ?? true) ? nil : body
-        req.setValue(try sign(path: path, query: query, content: signContent), forHTTPHeaderField: "Signature")
+        switch auth {
+        case .partner(let clientId, let consumerKey):
+            var params = queryParams + authParams
+            params.append(("clientId", clientId))
+            params.append(("timestamp", String(Int(Date().timeIntervalSince1970))))
+            let query = queryString(params)
+            req = URLRequest(url: URL(string: "\(baseURL.absoluteString)\(path)?\(query)")!)
+            req.httpMethod = method
+            // Server signs falsy bodies as null, so an empty {} must be signed as null too.
+            let signContent: Any? = (body?.isEmpty ?? true) ? nil : body
+            req.setValue(
+                try sign(path: path, query: query, content: signContent, consumerKey: consumerKey),
+                forHTTPHeaderField: "Signature"
+            )
+        case .bearer(let accessToken):
+            let query = queryString(queryParams)
+            let url = query.isEmpty ? "\(baseURL.absoluteString)\(path)" : "\(baseURL.absoluteString)\(path)?\(query)"
+            req = URLRequest(url: URL(string: url)!)
+            req.httpMethod = method
+            req.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        }
+
         if let body {
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
             req.httpBody = try canonicalJSON(body)
@@ -127,7 +156,8 @@ struct SnapTradeClient {
         let data = try await request(
             method: "GET",
             path: "/api/v1/accounts/\(accountId)/activities",
-            userParams: userParams(userId, userSecret) + [("startDate", startDate), ("limit", "250")]
+            authParams: userParams(userId, userSecret),
+            queryParams: [("startDate", startDate), ("limit", "250")]
         )
         return try JSONDecoder().decode(STActivityPage.self, from: data).data
     }
@@ -137,7 +167,7 @@ struct SnapTradeClient {
         _ = try await request(
             method: "DELETE",
             path: "/api/v1/authorizations/\(id)",
-            userParams: userParams(userId, userSecret)
+            authParams: userParams(userId, userSecret)
         )
     }
 
@@ -145,7 +175,7 @@ struct SnapTradeClient {
         let data = try await request(
             method: "GET",
             path: "/api/v1/authorizations",
-            userParams: userParams(userId, userSecret)
+            authParams: userParams(userId, userSecret)
         )
         return try JSONDecoder().decode([STAuthorization].self, from: data)
     }
@@ -158,7 +188,7 @@ struct SnapTradeClient {
         let data = try await request(
             method: "POST",
             path: "/api/v1/snapTrade/login",
-            userParams: userParams(userId, userSecret),
+            authParams: userParams(userId, userSecret),
             body: body
         )
         let resp = try JSONDecoder().decode(STLoginResponse.self, from: data)
@@ -172,7 +202,7 @@ struct SnapTradeClient {
         let data = try await request(
             method: "GET",
             path: "/api/v1/accounts",
-            userParams: userParams(userId, userSecret)
+            authParams: userParams(userId, userSecret)
         )
         return try JSONDecoder().decode([STAccount].self, from: data)
     }
@@ -181,7 +211,7 @@ struct SnapTradeClient {
         let data = try await request(
             method: "GET",
             path: "/api/v1/accounts/\(accountId)/positions",
-            userParams: userParams(userId, userSecret)
+            authParams: userParams(userId, userSecret)
         )
         return try JSONDecoder().decode([STPosition].self, from: data)
     }
@@ -190,7 +220,7 @@ struct SnapTradeClient {
         let data = try await request(
             method: "GET",
             path: "/api/v1/accounts/\(accountId)/balances",
-            userParams: userParams(userId, userSecret)
+            authParams: userParams(userId, userSecret)
         )
         return try JSONDecoder().decode([STBalance].self, from: data)
     }

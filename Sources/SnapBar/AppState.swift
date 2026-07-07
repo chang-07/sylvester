@@ -56,7 +56,23 @@ final class AppState: ObservableObject {
     private var knownDisabledAuthIds: Set<String>?
 
     var client: SnapTradeClient {
-        SnapTradeClient(clientId: config.clientId, consumerKey: config.consumerKey)
+        // Personal keys authenticate with the OAuth bearer token; partner keys with HMAC.
+        var c: SnapTradeClient
+        if config.mode == .personal, let token = config.accessToken, !token.isEmpty {
+            c = SnapTradeClient(bearerToken: token)
+        } else {
+            c = SnapTradeClient(clientId: config.clientId, consumerKey: config.consumerKey)
+        }
+        if let api = config.apiBaseURL, let url = URL(string: api) { c.baseURL = url }
+        return c
+    }
+
+    // OAuthClient with any host overrides from config applied (defaults to prod).
+    private func makeOAuthClient() -> OAuthClient {
+        var oauth = OAuthClient()
+        // apiBase drives discovery, which in turn yields the authorize/token/register URLs.
+        if let api = config.apiBaseURL, let url = URL(string: api) { oauth.apiBase = url }
+        return oauth
     }
 
     init() {
@@ -200,6 +216,16 @@ final class AppState: ObservableObject {
             return
         }
         config = cfg
+        if cfg.mode == .personal {
+            // Personal keys don't paste creds — they sign in via OAuth (browser).
+            if cfg.hasOAuthSession {
+                phase = .ready
+                Task { await refresh() }
+            } else {
+                phase = .needsConfig("Sign in with SnapTrade to connect your personal key.")
+            }
+            return
+        }
         if !cfg.hasPartnerCreds {
             phase = .needsConfig("Add clientId + consumerKey to config, then reload.")
         } else if !cfg.hasUser {
@@ -218,6 +244,39 @@ final class AppState: ObservableObject {
     @Published var setupBusy = false
     // Re-opens the key wizard from the ⋯ menu even when already configured (key rotation).
     @Published var showSetup = false
+
+    // Wizard field drafts live here, NOT as @State in the view: the MenuBarExtra window
+    // tears down its view (and all its @State) whenever it loses focus — e.g. when you
+    // switch to the browser to copy your key — so form input must survive on the
+    // persistent AppState or it's wiped every time the popover reopens.
+    @Published var draftClientId = ""
+    @Published var draftConsumerKey = ""
+    @Published var draftUserId = ""
+    @Published var draftUserSecret = ""
+    @Published var draftAdvanced = false
+    private var setupDraftSeeded = false
+
+    // Seed drafts from config once per wizard session; guarded so a reopen never clobbers
+    // what's been typed. (Fresh setup: config is empty → drafts stay empty.)
+    func seedSetupDraftIfNeeded() {
+        guard !setupDraftSeeded else { return }
+        draftClientId = config.clientId
+        draftConsumerKey = config.consumerKey
+        draftUserId = config.userId
+        setupDraftSeeded = true
+    }
+
+    // Explicit close (Cancel / successful setup) — clears drafts so the next open re-seeds
+    // from the current config. NOT called when the popover merely loses focus.
+    func dismissSetup() {
+        showSetup = false
+        setupDraftSeeded = false
+        draftClientId = ""
+        draftConsumerKey = ""
+        draftUserId = ""
+        draftUserSecret = ""
+        draftAdvanced = false
+    }
 
     // Wizard path: validate pasted partner creds, persist (secrets -> keychain),
     // register a user if none supplied, then go live.
@@ -259,7 +318,7 @@ final class AppState: ObservableObject {
             await registerUser()
         }
         if case .ready = phase, errorMessage == nil {
-            showSetup = false
+            dismissSetup()
         }
     }
 
@@ -274,6 +333,75 @@ final class AppState: ObservableObject {
 
     var secretsInKeychain: Bool {
         KeychainStore.get("consumerKey") != nil
+    }
+
+    // MARK: - Personal-key OAuth
+
+    // Browser sign-in for personal keys: register a public OAuth client once, run the
+    // authorization-code flow, and store the bearer + refresh tokens. No key paste — the
+    // dashboard login resolves the personal partner + user on the server.
+    func signInWithSnapTrade() async {
+        setupBusy = true
+        defer { setupBusy = false }
+        let oauth = makeOAuthClient()
+        do {
+            let clientId: String
+            if let existing = config.oauthClientId, !existing.isEmpty {
+                clientId = existing
+            } else {
+                clientId = try await oauth.registerClient(clientName: "SnapBar")
+                config.oauthClientId = clientId
+            }
+            let tokens = try await oauth.authorize(clientId: clientId)
+            config.authMode = AuthMode.personal.rawValue
+            config.accessToken = tokens.accessToken
+            config.refreshToken = tokens.refreshToken
+            config.accessTokenExpiry = tokens.expiry.timeIntervalSince1970
+            // Personal OAuth ignores partner creds — clear any leftovers (incl. Keychain).
+            config.clientId = ""
+            config.consumerKey = ""
+            config.userId = ""
+            config.userSecret = ""
+            KeychainStore.delete("consumerKey")
+            KeychainStore.delete("userSecret")
+            try config.save()
+            errorMessage = nil
+            phase = .ready
+            dismissSetup()
+            await refresh()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    // Refresh the access token when missing/near expiry. false => unrecoverable (re-sign-in).
+    private func ensureFreshTokenIfNeeded() async -> Bool {
+        guard config.mode == .personal else { return true }
+        let now = Date().timeIntervalSince1970
+        let valid = !(config.accessToken ?? "").isEmpty && (config.accessTokenExpiry ?? 0) - now > 300
+        if valid { return true }
+        guard let refreshToken = config.refreshToken, !refreshToken.isEmpty,
+              let clientId = config.oauthClientId, !clientId.isEmpty else { return false }
+        do {
+            let tokens = try await makeOAuthClient().refresh(refreshToken: refreshToken, clientId: clientId)
+            config.accessToken = tokens.accessToken
+            config.refreshToken = tokens.refreshToken     // rotated — must persist the new one
+            config.accessTokenExpiry = tokens.expiry.timeIntervalSince1970
+            try config.save()
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    func signOutPersonal() {
+        config.clearOAuthSession()
+        try? config.save()
+        groups = []
+        details = [:]
+        netWorth = 0
+        attentionConnections = []
+        phase = .needsConfig("Signed out — sign in with SnapTrade to reconnect.")
     }
 
     // MARK: - Actions
@@ -309,6 +437,11 @@ final class AppState: ObservableObject {
 
     func refresh(fullDetails: Bool = true) async {
         guard case .ready = phase, !isRefreshing else { return }
+        // Personal OAuth: make sure the bearer token is fresh before any data calls.
+        if config.mode == .personal, !(await ensureFreshTokenIfNeeded()) {
+            phase = .needsConfig("Session expired — sign in with SnapTrade again.")
+            return
+        }
         isRefreshing = true
         defer { isRefreshing = false }
         do {

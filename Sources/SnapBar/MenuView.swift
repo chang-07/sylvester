@@ -28,80 +28,113 @@ struct MenuView: View {
     }
 
     // MARK: - Setup
+    //
+    // Field drafts live on AppState (state.draft*), not @State here — the MenuBarExtra
+    // window discards this view's state whenever it loses focus.
 
-    @State private var setupClientId = ""
-    @State private var setupConsumerKey = ""
-    @State private var setupUserId = ""
-    @State private var setupUserSecret = ""
-    @State private var setupAdvanced = false
+    // The partner-key section is collapsed by default; this is just a disclosure toggle
+    // (no user input), so local @State is fine — re-opened on appear if partner input exists.
+    @State private var showPartnerKey = false
 
     private func setupView(_ message: String) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             Label("Set up SnapBar", systemImage: "gearshape")
                 .font(.headline)
-            Text("Bring your own SnapTrade key — everything stays on this Mac (keys in the Keychain, data pulled directly from the SnapTrade API).")
+            Text("Connect your SnapTrade account. Everything stays on this Mac — tokens in the Keychain, data pulled straight from the SnapTrade API.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Button {
-                NSWorkspace.shared.open(URL(string: "https://dashboard.snaptrade.com")!)
-            } label: {
-                Label("Get a personal key at dashboard.snaptrade.com", systemImage: "arrow.up.right.square")
-                    .font(.caption)
-            }
-            .buttonStyle(.link)
-
-            VStack(spacing: 6) {
-                TextField("clientId (e.g. YOURNAME-ABCXYZ)", text: $setupClientId)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.system(.caption, design: .monospaced))
-                SecureField("consumerKey", text: $setupConsumerKey)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.system(.caption, design: .monospaced))
-            }
-
-            DisclosureGroup("Already have a SnapTrade user? (optional)", isExpanded: $setupAdvanced) {
-                VStack(spacing: 6) {
-                    TextField("userId — blank to auto-register", text: $setupUserId)
-                        .textFieldStyle(.roundedBorder)
-                        .font(.system(.caption, design: .monospaced))
-                    SecureField("userSecret", text: $setupUserSecret)
-                        .textFieldStyle(.roundedBorder)
-                        .font(.system(.caption, design: .monospaced))
+            // Primary path: personal-key OAuth. Nothing to paste — sign in via the browser.
+            VStack(alignment: .leading, spacing: 4) {
+                Button {
+                    Task { await state.signInWithSnapTrade() }
+                } label: {
+                    HStack(spacing: 6) {
+                        if state.setupBusy {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Image(systemName: "person.badge.key.fill")
+                        }
+                        Text(state.setupBusy ? "Waiting for browser sign-in…" : "Sign in with SnapTrade")
+                    }
+                    .frame(maxWidth: .infinity)
                 }
-                .padding(.top, 4)
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .disabled(state.setupBusy)
+
+                Text("Opens your browser to sign in with your SnapTrade account — no API key needed.")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .font(.caption)
 
             if let error = state.errorMessage {
                 errorBanner(error)
             }
 
+            // Advanced path: classic partner API key (clientId + consumerKey, HMAC + registerUser).
+            DisclosureGroup(isExpanded: $showPartnerKey) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Button {
+                        NSWorkspace.shared.open(URL(string: "https://dashboard.snaptrade.com")!)
+                    } label: {
+                        Label("Get a key at dashboard.snaptrade.com", systemImage: "arrow.up.right.square")
+                            .font(.caption2)
+                    }
+                    .buttonStyle(.link)
+
+                    TextField("clientId (e.g. YOURNAME-ABCXYZ)", text: $state.draftClientId)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(.caption, design: .monospaced))
+                    SecureField("consumerKey", text: $state.draftConsumerKey)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.system(.caption, design: .monospaced))
+
+                    DisclosureGroup("Already have a SnapTrade user? (optional)", isExpanded: $state.draftAdvanced) {
+                        VStack(spacing: 6) {
+                            TextField("userId — blank to auto-register", text: $state.draftUserId)
+                                .textFieldStyle(.roundedBorder)
+                                .font(.system(.caption, design: .monospaced))
+                            SecureField("userSecret", text: $state.draftUserSecret)
+                                .textFieldStyle(.roundedBorder)
+                                .font(.system(.caption, design: .monospaced))
+                        }
+                        .padding(.top, 4)
+                    }
+                    .font(.caption2)
+
+                    Button {
+                        Task {
+                            await state.completeSetup(
+                                clientId: state.draftClientId,
+                                consumerKey: state.draftConsumerKey,
+                                userId: state.draftUserId,
+                                userSecret: state.draftUserSecret
+                            )
+                        }
+                    } label: {
+                        if state.setupBusy {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Text("Validate & Connect")
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(state.setupBusy || state.draftClientId.isEmpty || state.draftConsumerKey.isEmpty)
+                    .padding(.top, 2)
+                }
+                .padding(.top, 6)
+            } label: {
+                Text("Advanced: use a partner API key").font(.caption)
+            }
+
             HStack {
-                Button {
-                    Task {
-                        await state.completeSetup(
-                            clientId: setupClientId,
-                            consumerKey: setupConsumerKey,
-                            userId: setupUserId,
-                            userSecret: setupUserSecret
-                        )
-                    }
-                } label: {
-                    if state.setupBusy {
-                        ProgressView().controlSize(.small)
-                    } else {
-                        Text("Validate & Connect")
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(state.setupBusy || setupClientId.isEmpty || setupConsumerKey.isEmpty)
-
                 if case .ready = state.phase {
-                    Button("Cancel") { state.showSetup = false }
+                    Button("Cancel") { state.dismissSetup() }
+                        .controlSize(.small)
                 }
-
                 Spacer()
                 Menu {
                     Button("Open Config File") { state.openConfig() }
@@ -117,9 +150,8 @@ struct MenuView: View {
         }
         .padding(12)
         .onAppear {
-            setupClientId = state.config.clientId
-            setupConsumerKey = state.config.consumerKey
-            setupUserId = state.config.userId
+            state.seedSetupDraftIfNeeded()
+            if !state.draftClientId.isEmpty { showPartnerKey = true }
         }
     }
 
@@ -571,12 +603,16 @@ struct MenuView: View {
             Menu {
                 Button(state.privacyMode ? "Show Amounts" : "Hide Amounts") { state.privacyMode.toggle() }
                 Divider()
-                Button("Edit API Keys…") { state.showSetup = true }
+                if state.config.mode == .personal {
+                    Button("Sign Out of SnapTrade") { state.signOutPersonal() }
+                } else {
+                    Button("Edit API Keys…") { state.showSetup = true }
+                    if !state.secretsInKeychain {
+                        Button("Move Keys to Keychain") { state.moveKeysToKeychain() }
+                    }
+                }
                 Button("Open Config") { state.openConfig() }
                 Button("Reload Config") { state.reloadConfig() }
-                if !state.secretsInKeychain {
-                    Button("Move Keys to Keychain") { state.moveKeysToKeychain() }
-                }
                 if Notifier.shared.available {
                     Button("Test Notification") {
                         Notifier.shared.post(
