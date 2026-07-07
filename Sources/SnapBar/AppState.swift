@@ -186,10 +186,19 @@ final class AppState: ObservableObject {
         if !suffix.isEmpty {
             label = label + Text("  \(suffix)")
                 .font(.system(size: 12))
-                .foregroundColor(fg.opacity(0.72))
+                .foregroundColor(fg.opacity(0.85))
         }
 
-        let renderer = ImageRenderer(content: label.padding(.bottom, 1))
+        // The menubar is translucent and shows the desktop wallpaper, and its tint tracks the
+        // wallpaper (not the system light/dark), so baked colors wash out on a mismatched
+        // background. A contrasting halo keeps the text legible over anything.
+        let halo: Color = isDark ? .black.opacity(0.6) : .white.opacity(0.7)
+        let content = label
+            .shadow(color: halo, radius: 1.2)
+            .shadow(color: halo, radius: 0.8)
+            .padding(.horizontal, 2)
+            .padding(.bottom, 1)
+        let renderer = ImageRenderer(content: content)
         renderer.scale = 2
         guard let image = renderer.nsImage else { return nil }
         image.isTemplate = false
@@ -504,6 +513,17 @@ final class AppState: ObservableObject {
             if fullDetails { await fetchQuotes() }
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    // Event-driven refresh when the user reopens the popover (e.g. after finishing a browser
+    // reconnect) — picks up changes without a background polling loop. Throttled so rapid
+    // reopens don't hammer the API; always refreshes while a connection needs attention.
+    func refreshOnReopen() async {
+        guard case .ready = phase, !isRefreshing else { return }
+        let stale = lastRefresh.map { Date().timeIntervalSince($0) > 45 } ?? true
+        if stale || !attentionConnections.isEmpty {
+            await refresh(fullDetails: false)
         }
     }
 

@@ -25,6 +25,9 @@ struct MenuView: View {
             }
         }
         .frame(width: 340)
+        // Refresh when the popover opens (throttled) — event-driven pickup after a reconnect,
+        // no background polling. No-op unless ready + stale or a connection needs attention.
+        .onAppear { Task { await state.refreshOnReopen() } }
     }
 
     // MARK: - Setup
