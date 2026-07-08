@@ -13,6 +13,9 @@ struct AccountDetail {
     var positions: [STPosition] = []
     var cashByCurrency: [(code: String, amount: Double)] = []
     var activities: [STActivity] = []
+    // Live-fetched balance from GET /accounts/{id}; the listAccounts balance only
+    // advances on SnapTrade's daily background sync.
+    var liveBalance: STAccount.Balance?
     var error: String?
 }
 
@@ -460,24 +463,8 @@ final class AppState: ObservableObject {
             let auths = (try? await authsCall) ?? []
             let fx = await FXService.converter(base: config.baseCurrency, fallback: config.fxRates)
 
-            var byInstitution: [String: [STAccount]] = [:]
-            for account in accounts {
-                byInstitution[account.institutionName ?? "Other", default: []].append(account)
-            }
-            groups = byInstitution
-                .map { name, accts in
-                    InstitutionGroup(
-                        name: name,
-                        accounts: accts.sorted { $0.amount > $1.amount },
-                        totalInBase: accts.reduce(0) { $0 + fx.toBase($1.amount, from: $1.currency) }
-                    )
-                }
-                .sorted { $0.totalInBase > $1.totalInBase }
-            netWorth = groups.reduce(0) { $0 + $1.totalInBase }
             self.fx = fx
-            if !accounts.isEmpty {
-                HistoryStore.append(value: netWorth, currency: config.baseCurrency, to: &history)
-            }
+            rebuildTotals(from: accounts, fx: fx)
 
             let unconverted = Set(accounts.map(\.currency).filter { !fx.hasRate(for: $0) })
             if !unconverted.isEmpty {
@@ -510,10 +497,40 @@ final class AppState: ObservableObject {
             errorMessage = nil
 
             await fetchDetails(for: accounts, onlyMissing: !fullDetails)
+            // Re-total now that live balances are in; only record history from the live pass.
+            rebuildTotals(from: accounts, fx: fx)
+            if !accounts.isEmpty {
+                HistoryStore.append(value: netWorth, currency: config.baseCurrency, to: &history)
+            }
             if fullDetails { await fetchQuotes() }
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    // Group accounts by institution and total them in base currency, preferring each
+    // account's live-fetched balance over the cached listAccounts snapshot.
+    private func rebuildTotals(from accounts: [STAccount], fx: FXConverter) {
+        let effective = accounts.map { account -> STAccount in
+            guard let live = details[account.id]?.liveBalance else { return account }
+            var updated = account
+            updated.balance = live
+            return updated
+        }
+        var byInstitution: [String: [STAccount]] = [:]
+        for account in effective {
+            byInstitution[account.institutionName ?? "Other", default: []].append(account)
+        }
+        groups = byInstitution
+            .map { name, accts in
+                InstitutionGroup(
+                    name: name,
+                    accounts: accts.sorted { $0.amount > $1.amount },
+                    totalInBase: accts.reduce(0) { $0 + fx.toBase($1.amount, from: $1.currency) }
+                )
+            }
+            .sorted { $0.totalInBase > $1.totalInBase }
+        netWorth = groups.reduce(0) { $0 + $1.totalInBase }
     }
 
     // Event-driven refresh when the user reopens the popover (e.g. after finishing a browser
@@ -718,6 +735,8 @@ final class AppState: ObservableObject {
             for account in targets {
                 group.addTask {
                     var detail = AccountDetail()
+                    async let liveAccount = client.accountDetail(
+                        accountId: account.id, userId: userId, userSecret: userSecret)
                     do {
                         async let positions = client.positions(
                             accountId: account.id, userId: userId, userSecret: userSecret)
@@ -747,6 +766,11 @@ final class AppState: ObservableObject {
                     } catch {
                         detail.error = error.localizedDescription
                     }
+                    // Non-fatal; a nil total means the server itself fell back to an
+                    // empty cache — keep the listAccounts value rather than zeroing.
+                    if let live = (try? await liveAccount)?.balance, live.total?.amount != nil {
+                        detail.liveBalance = live
+                    }
                     return (account.id, detail)
                 }
             }
@@ -762,7 +786,10 @@ final class AppState: ObservableObject {
         var merged = details
         for (id, detail) in fetched {
             if detail.error != nil, let old = merged[id], old.error == nil { continue }
-            merged[id] = detail
+            var next = detail
+            // A previous refresh's live balance beats falling back to the daily snapshot.
+            if next.liveBalance == nil { next.liveBalance = merged[id]?.liveBalance }
+            merged[id] = next
         }
         details = merged.filter { currentIds.contains($0.key) }
         processActivities(details.values.flatMap(\.activities))

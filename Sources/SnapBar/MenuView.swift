@@ -440,7 +440,9 @@ struct MenuView: View {
                         Text(account.displayName).font(.callout).lineLimit(1)
                         if let sync = account.lastSync {
                             let stale = Date().timeIntervalSince(sync) > 36 * 3600
-                            Text("synced \(AppState.relative(sync))\(stale ? " ⚠︎" : "")")
+                            // With a live balance the sync time only governs the activity feed.
+                            let live = state.details[account.id]?.liveBalance != nil
+                            Text("\(live ? "live · feed " : "")synced \(AppState.relative(sync))\(stale ? " ⚠︎" : "")")
                                 .font(.caption2)
                                 .foregroundStyle(stale ? AnyShapeStyle(.orange) : AnyShapeStyle(.tertiary))
                         }

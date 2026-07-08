@@ -207,6 +207,16 @@ struct SnapTradeClient {
         return try JSONDecoder().decode([STAccount].self, from: data)
     }
 
+    // Single-account read — unlike listAccounts, the server live-fetches balance.total here.
+    func accountDetail(accountId: String, userId: String, userSecret: String) async throws -> STAccount {
+        let data = try await request(
+            method: "GET",
+            path: "/api/v1/accounts/\(accountId)",
+            authParams: userParams(userId, userSecret)
+        )
+        return try JSONDecoder().decode(STAccount.self, from: data)
+    }
+
     func positions(accountId: String, userId: String, userSecret: String) async throws -> [STPosition] {
         let data = try await request(
             method: "GET",
