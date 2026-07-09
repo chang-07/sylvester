@@ -201,6 +201,7 @@ struct AllocationView: View {
 struct TrendView: View {
     @ObservedObject var state: AppState
     @AppStorage("snapbar.trend.range") private var rangeIndex = 3
+    @State private var hovered: HistoryPoint?
 
     private static let ranges: [(label: String, seconds: TimeInterval?)] = [
         ("1H", 3600), ("1D", 86_400), ("1W", 604_800), ("All", nil),
@@ -227,8 +228,9 @@ struct TrendView: View {
                 emptyState(hasAnyHistory: all.count >= 2)
             } else {
                 let flows = state.flowEvents(since: points.first!.date)
-                header(points, flows: flows)
-                chart(points, flows: flows)
+                let adjusted = flows.isEmpty ? [] : adjustedSeries(points, flows: flows)
+                header(points, flows: flows, adjusted: adjusted)
+                chart(points, adjusted: adjusted)
                 if !flows.isEmpty {
                     Text("solid = net worth · dashed = excl. deposits/withdrawals")
                         .font(.system(size: 9))
@@ -272,7 +274,7 @@ struct TrendView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
     }
 
-    private func header(_ points: [HistoryPoint], flows: [(date: Date, amount: Double)]) -> some View {
+    private func header(_ points: [HistoryPoint], flows: [(date: Date, amount: Double)], adjusted: [HistoryPoint]) -> some View {
         let first = points.first!.v
         let last = points.last!.v
         let delta = last - first
@@ -283,32 +285,49 @@ struct TrendView: View {
         let growth = delta - netFlow
 
         return VStack(alignment: .leading, spacing: 1) {
-            HStack(alignment: .firstTextBaseline) {
-                if flat {
-                    Text("— flat")
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text("\(up ? "▲" : "▼") \(state.money(abs(delta), state.config.baseCurrency)) (\(String(format: "%.2f", abs(pct)))%)")
+            if let hovered {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(state.money(hovered.v, state.config.baseCurrency))
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(up ? .green : .red)
+                        .monospacedDigit()
+                    Spacer()
+                    Text(hovered.date.formatted(date: .abbreviated, time: .shortened))
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
                 }
-                Spacer()
-                Text("since \(points.first!.date.formatted(date: .abbreviated, time: .shortened))")
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-            }
-            if abs(netFlow) > 0.01 {
-                let growthUp = growth >= 0
-                Text("\(growthUp ? "▲" : "▼") \(state.money(abs(growth), state.config.baseCurrency)) excl. \(state.money(netFlow, state.config.baseCurrency)) net deposits")
-                    .font(.caption2)
-                    .foregroundStyle(growthUp ? AnyShapeStyle(Color.green.opacity(0.85)) : AnyShapeStyle(Color.red.opacity(0.85)))
+                if abs(netFlow) > 0.01, let adj = adjusted.last(where: { $0.t == hovered.t }) {
+                    Text("excl. deposits: \(state.money(adj.v, state.config.baseCurrency))")
+                        .font(.caption2)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                HStack(alignment: .firstTextBaseline) {
+                    if flat {
+                        Text("— flat")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("\(up ? "▲" : "▼") \(state.money(abs(delta), state.config.baseCurrency)) (\(String(format: "%.2f", abs(pct)))%)")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(up ? .green : .red)
+                    }
+                    Spacer()
+                    Text("since \(points.first!.date.formatted(date: .abbreviated, time: .shortened))")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+                if abs(netFlow) > 0.01 {
+                    let growthUp = growth >= 0
+                    Text("\(growthUp ? "▲" : "▼") \(state.money(abs(growth), state.config.baseCurrency)) excl. \(state.money(netFlow, state.config.baseCurrency)) net deposits")
+                        .font(.caption2)
+                        .foregroundStyle(growthUp ? AnyShapeStyle(Color.green.opacity(0.85)) : AnyShapeStyle(Color.red.opacity(0.85)))
+                }
             }
         }
     }
 
-    private func chart(_ points: [HistoryPoint], flows: [(date: Date, amount: Double)]) -> some View {
-        let adjusted = flows.isEmpty ? [] : adjustedSeries(points, flows: flows)
+    private func chart(_ points: [HistoryPoint], adjusted: [HistoryPoint]) -> some View {
         let values = points.map(\.v) + adjusted.map(\.v)
         let lo = values.min() ?? 0
         let hi = values.max() ?? 1
@@ -348,12 +367,23 @@ struct TrendView: View {
                 .foregroundStyle(slate.opacity(0.85))
                 .lineStyle(StrokeStyle(lineWidth: 1.3, dash: [4, 3]))
             }
-            if let last = points.last {
+            if let last = points.last, hovered == nil {
                 PointMark(
                     x: .value("Time", last.date),
                     y: .value("Net worth", last.v)
                 )
                 .symbolSize(36)
+                .foregroundStyle(tint)
+            }
+            if let hovered {
+                RuleMark(x: .value("Time", hovered.date))
+                    .foregroundStyle(.tertiary)
+                    .lineStyle(StrokeStyle(lineWidth: 1))
+                PointMark(
+                    x: .value("Time", hovered.date),
+                    y: .value("Net worth", hovered.v)
+                )
+                .symbolSize(42)
                 .foregroundStyle(tint)
             }
         }
@@ -378,5 +408,37 @@ struct TrendView: View {
                     .foregroundStyle(.tertiary)
             }
         }
+        .chartOverlay { proxy in
+            GeometryReader { geo in
+                Rectangle()
+                    .fill(Color.clear)
+                    .contentShape(Rectangle())
+                    .onContinuousHover { phase in
+                        switch phase {
+                        case .active(let location):
+                            let plot = geo[proxy.plotAreaFrame]
+                            if let date: Date = proxy.value(atX: location.x - plot.origin.x) {
+                                hovered = nearestPoint(to: date, in: points)
+                            }
+                        case .ended:
+                            hovered = nil
+                        }
+                    }
+            }
+        }
+    }
+
+    // Points are sorted by time, so binary-search the closest snapshot to the pointer.
+    private func nearestPoint(to date: Date, in points: [HistoryPoint]) -> HistoryPoint? {
+        guard !points.isEmpty else { return nil }
+        let t = date.timeIntervalSince1970
+        var lo = 0
+        var hi = points.count - 1
+        while lo < hi {
+            let mid = (lo + hi) / 2
+            if points[mid].t < t { lo = mid + 1 } else { hi = mid }
+        }
+        if lo > 0, abs(points[lo - 1].t - t) < abs(points[lo].t - t) { lo -= 1 }
+        return points[lo]
     }
 }
