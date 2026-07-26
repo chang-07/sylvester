@@ -7,7 +7,7 @@ enum AuthMode: String, Codable {
     case personal
 }
 
-struct SnapBarConfig: Codable {
+struct SylvesterConfig: Codable {
     var clientId: String
     var consumerKey: String
     var userId: String
@@ -30,10 +30,10 @@ struct SnapBarConfig: Codable {
     var apiBaseURL: String? = nil        // default https://api.snaptrade.com
 
     static let dir = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent(".config/snapbar", isDirectory: true)
+        .appendingPathComponent(".config/sylvester", isDirectory: true)
     static let path = dir.appendingPathComponent("config.json")
 
-    static let template = SnapBarConfig(
+    static let template = SylvesterConfig(
         clientId: "",
         consumerKey: "",
         userId: "",
@@ -51,9 +51,9 @@ struct SnapBarConfig: Codable {
     // short-lived and re-minted from it); the access token alone suffices right after login.
     var hasOAuthSession: Bool { !(refreshToken ?? "").isEmpty || !(accessToken ?? "").isEmpty }
 
-    static func load() -> SnapBarConfig? {
+    static func load() -> SylvesterConfig? {
         guard let data = try? Data(contentsOf: path) else { return nil }
-        guard var cfg = try? JSONDecoder().decode(SnapBarConfig.self, from: data) else { return nil }
+        guard var cfg = try? JSONDecoder().decode(SylvesterConfig.self, from: data) else { return nil }
         // Stray whitespace in pasted keys breaks signing with an opaque 401.
         cfg.clientId = cfg.clientId.trimmingCharacters(in: .whitespacesAndNewlines)
         cfg.consumerKey = cfg.consumerKey.trimmingCharacters(in: .whitespacesAndNewlines)

@@ -1,33 +1,33 @@
 <p align="center">
-  <img src="docs/title-card.png" alt="SnapBar — your net worth, every brokerage, right in the menubar" width="820">
+  <img src="docs/title-card.png" alt="Sylvester — your net worth, every brokerage, right in the menubar" width="820">
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/macOS-14%2B-111?logo=apple&logoColor=white" alt="macOS 14+">
   <img src="https://img.shields.io/badge/Swift-5.10-F05138?logo=swift&logoColor=white" alt="Swift 5.10">
-  <img src="https://img.shields.io/badge/release-v0.1.0-2E9E93" alt="v0.1.0">
+  <img src="https://img.shields.io/badge/release-v0.2.0-2E9E93" alt="v0.2.0">
   <img src="https://img.shields.io/badge/data-read--only-999" alt="read-only">
 </p>
 
-**SnapBar** is a macOS menubar app showing your net worth and per-account breakdown across every brokerage you've linked in [SnapTrade](https://snaptrade.com) — holdings, allocation, a net-worth trend, and an activity feed with native notifications for new dividends, trades, and deposits. It's a pure local client: tokens live in the macOS Keychain and data is pulled straight from the SnapTrade API.
+**Sylvester** is a macOS menubar app showing your net worth and per-account breakdown across every brokerage you've linked in [SnapTrade](https://snaptrade.com) — holdings, allocation, a net-worth trend, and an activity feed with native notifications for new dividends, trades, and deposits. It's a pure local client: tokens live in the macOS Keychain and data is pulled straight from the SnapTrade API.
 
 ## Install
 
 **Homebrew** (recommended):
 
 ```sh
-brew install --cask chang-07/tap/snapbar
+brew install --cask chang-07/tap/sylvester
 ```
 
-Or grab the **`.dmg`** from [Releases](https://github.com/chang-07/snapbar/releases/latest) and drag **SnapBar** to **Applications**.
+Or grab the **`.dmg`** from [Releases](https://github.com/chang-07/sylvester/releases/latest) and drag **Sylvester** to **Applications**.
 
-SnapBar is ad-hoc signed (not notarized), so clear the download quarantine once:
+Sylvester is ad-hoc signed (not notarized), so clear the download quarantine once:
 
 ```sh
-xattr -dr com.apple.quarantine /Applications/SnapBar.app
+xattr -dr com.apple.quarantine /Applications/Sylvester.app
 ```
 
-(or skip it with `HOMEBREW_CASK_OPTS="--no-quarantine" brew install --cask chang-07/tap/snapbar`). Then launch — the icon appears in your menubar. Requires macOS 14+ (Apple Silicon).
+(or skip it with `HOMEBREW_CASK_OPTS="--no-quarantine" brew install --cask chang-07/tap/sylvester`). Then launch — the icon appears in your menubar. Requires macOS 14+ (Apple Silicon).
 
 Build from source instead: `./install.sh`.
 
@@ -39,7 +39,7 @@ Prefer a partner API key? Expand **Advanced** in the wizard to paste a `clientId
 
 ## Config
 
-Non-secret settings live at `~/.config/snapbar/config.json` (chmod 600):
+Non-secret settings live at `~/.config/sylvester/config.json` (chmod 600):
 
 - `baseCurrency` — net-worth display currency (default `USD`)
 - `refreshMinutes` — auto-refresh cadence (default 15)
@@ -51,11 +51,12 @@ Non-secret settings live at `~/.config/snapbar/config.json` (chmod 600):
 - **Read-only.** Personal sign-in uses SnapTrade's OAuth2 bearer flow (PKCE, `read` scope); partner keys use canonical-JSON HMAC-SHA256 signing. Neither can trade or move money.
 - Balances come from SnapTrade's cached reads (no forced broker refreshes), so data moves at broker sync cadence — roughly daily. Rows flag anything staler than 36h.
 - Notifications require the `.app` bundle (a bare `swift run` can't post them).
+- **Launch at login** lives in the ⋯ menu. macOS may ask you to approve Sylvester under **Login Items** in System Settings before it takes effect.
 
 ## Develop
 
 ```sh
-./make-app.sh && open dist/SnapBar.app   # build + run the bundle
+./make-app.sh && open dist/Sylvester.app   # build + run the bundle
 ./install.sh                             # build + install to /Applications
 ./release.sh                             # build a distributable .dmg
 ```

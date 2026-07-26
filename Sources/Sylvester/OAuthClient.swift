@@ -216,7 +216,7 @@ struct OAuthClient {
 // One-shot loopback HTTP server that captures a single OAuth redirect on 127.0.0.1.
 // A custom URL scheme would be simpler, but the backend only allows http loopback redirects.
 private final class LoopbackReceiver: @unchecked Sendable {
-    private let queue = DispatchQueue(label: "com.chang.snapbar.oauth-loopback")
+    private let queue = DispatchQueue(label: "com.chang.sylvester.oauth-loopback")
     private var listener: NWListener?
     private var continuation: CheckedContinuation<[String: String], Error>?
     private var pendingResult: [String: String]?
@@ -287,10 +287,10 @@ private final class LoopbackReceiver: @unchecked Sendable {
     }
 
     private func respond(_ conn: NWConnection, success: Bool) {
-        let title = success ? "SnapBar is connected" : "Sign-in didn’t complete"
-        let sub = success ? "You can close this tab and return to SnapBar." : "Return to SnapBar and try again."
+        let title = success ? "Sylvester is connected" : "Sign-in didn’t complete"
+        let sub = success ? "You can close this tab and return to Sylvester." : "Return to Sylvester and try again."
         let html = """
-        <!doctype html><html><head><meta charset="utf-8"><title>SnapBar</title><style>\
+        <!doctype html><html><head><meta charset="utf-8"><title>Sylvester</title><style>\
         body{font:15px -apple-system,system-ui,sans-serif;margin:0;height:100vh;display:flex;\
         align-items:center;justify-content:center;background:#111418;color:#e6e6e6}\
         .t{font-size:19px;font-weight:600;margin-bottom:6px}.m{color:#9aa0a6}.c{text-align:center}\

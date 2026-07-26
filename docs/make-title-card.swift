@@ -1,4 +1,4 @@
-// Composes docs/title-card.png — the README hero. Dark banner: icon + "SnapBar" lockup and
+// Composes docs/title-card.png — the README hero. Dark banner: icon + "Sylvester" lockup and
 // tagline on the left, the app screenshot (rounded, shadowed, bottom noise cropped) on the right.
 // Usage: swift docs/make-title-card.swift   (run from repo root)
 import AppKit
@@ -43,7 +43,7 @@ let iconRect = CGRect(x: 82, y: 372 - iconSize / 2, width: iconSize, height: ico
 if let icon = NSImage(contentsOfFile: "icon/AppIcon.iconset/icon_256x256.png") {
     icon.draw(in: iconRect)
 }
-draw("SnapBar", x: iconRect.maxX + 26, y: 372 - 26, size: 62, weight: .bold, color: .white)
+draw("Sylvester", x: iconRect.maxX + 26, y: 372 - 26, size: 62, weight: .bold, color: .white)
 
 // Teal→gold accent underline (nods to the mark + SnapTrade).
 let accent = CGRect(x: iconRect.maxX + 30, y: 372 - 44, width: 196, height: 7)

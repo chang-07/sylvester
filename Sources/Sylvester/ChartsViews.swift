@@ -1,24 +1,12 @@
 import Charts
 import SwiftUI
 
-// Cohesive dashboard palette; slate is reserved for Other/Unclassified.
-private let palette: [Color] = [
-    Color(red: 0.38, green: 0.55, blue: 0.98),  // cornflower
-    Color(red: 0.29, green: 0.79, blue: 0.68),  // teal
-    Color(red: 0.98, green: 0.72, blue: 0.32),  // amber
-    Color(red: 0.94, green: 0.44, blue: 0.53),  // rose
-    Color(red: 0.66, green: 0.53, blue: 0.96),  // violet
-    Color(red: 0.36, green: 0.77, blue: 0.97),  // sky
-    Color(red: 0.67, green: 0.85, blue: 0.46),  // lime
-    Color(red: 0.95, green: 0.56, blue: 0.36),  // coral
-]
-private let slate = Color(red: 0.56, green: 0.61, blue: 0.69)
 
 // MARK: - Allocation donut
 
 struct AllocationView: View {
     @ObservedObject var state: AppState
-    @AppStorage("snapbar.allocation.dim") private var dimensionRaw = AppState.AllocationDimension.asset.rawValue
+    @AppStorage("sylvester.allocation.dim") private var dimensionRaw = AppState.AllocationDimension.asset.rawValue
     @State private var hovered: String?
 
     private var dimension: AppState.AllocationDimension {
@@ -30,14 +18,10 @@ struct AllocationView: View {
         let total = slices.reduce(0.0) { $0 + $1.value }
 
         return VStack(alignment: .leading, spacing: 10) {
-            Picker("", selection: $dimensionRaw) {
-                ForEach(AppState.AllocationDimension.allCases) { dim in
-                    Text(dim.rawValue).tag(dim.rawValue)
-                }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .controlSize(.small)
+            PillRow(
+                pills: AppState.AllocationDimension.allCases.map { .init($0.rawValue, $0.rawValue) },
+                selection: $dimensionRaw
+            )
 
             if slices.isEmpty {
                 emptyState
@@ -46,8 +30,11 @@ struct AllocationView: View {
                 legend(slices, total: total)
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        // 12/8 matches the tab bar above and the Activity tab's filter row — at 14 the
+        // sub-selector sat 2pt inside the tabs it belongs to, which read as misaligned.
+        .padding(.horizontal, 12)
+        .padding(.top, 8)
+        .padding(.bottom, 10)
     }
 
     private var emptyState: some View {
@@ -104,7 +91,7 @@ struct AllocationView: View {
                     .lineLimit(1)
                     .frame(maxWidth: 78)
                 Text(state.moneyCompact(slice.value, state.config.baseCurrency))
-                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .font(Theme.figureSmall)
                     .monospacedDigit()
                 Text(total > 0 ? String(format: "%.1f%%", slice.value / total * 100) : "")
                     .font(.caption2)
@@ -113,7 +100,7 @@ struct AllocationView: View {
         } else {
             VStack(spacing: 1) {
                 Text(state.moneyCompact(total, state.config.baseCurrency))
-                    .font(.system(size: 17, weight: .semibold, design: .rounded))
+                    .font(Theme.figure)
                     .monospacedDigit()
                 Text(dimension.rawValue.lowercased() + " mix")
                     .font(.caption2)
@@ -150,9 +137,9 @@ struct AllocationView: View {
     }
 
     private func color(for slice: AppState.AllocationSlice, in slices: [AppState.AllocationSlice]) -> Color {
-        if slice.name == "Other" || slice.name == "Unclassified" { return slate }
+        if slice.name == "Other" || slice.name == "Unclassified" { return Theme.muted }
         let index = slices.firstIndex(where: { $0.id == slice.id }) ?? 0
-        return palette[index % palette.count]
+        return Theme.series[index % Theme.series.count]
     }
 
     private func legend(_ slices: [AppState.AllocationSlice], total: Double) -> some View {
@@ -200,29 +187,44 @@ struct AllocationView: View {
 
 struct TrendView: View {
     @ObservedObject var state: AppState
-    @AppStorage("snapbar.trend.range") private var rangeIndex = 3
+    // Stores the range by name, not by index into the array — a positional key silently
+    // remaps everyone's saved choice whenever the range list changes. (Supersedes the old
+    // Int-valued "sylvester.trend.range".)
+    @AppStorage("sylvester.trend.rangeID") private var rangeID = Range.all.rawValue
     @State private var hovered: HistoryPoint?
 
-    private static let ranges: [(label: String, seconds: TimeInterval?)] = [
-        ("1H", 3600), ("1D", 86_400), ("1W", 604_800), ("All", nil),
-    ]
+    // Calendar-relative rather than fixed durations, so "1M" means last month, not 30 days,
+    // and YTD is expressible at all.
+    private enum Range: String, CaseIterable, Identifiable {
+        case d1 = "1D", w1 = "1W", m1 = "1M", m3 = "3M", ytd = "YTD", y1 = "1Y", all = "All"
+        var id: String { rawValue }
+
+        func start(now: Date) -> Date? {
+            let cal = Calendar.current
+            switch self {
+            case .d1: return now.addingTimeInterval(-86_400)
+            case .w1: return now.addingTimeInterval(-604_800)
+            case .m1: return cal.date(byAdding: .month, value: -1, to: now)
+            case .m3: return cal.date(byAdding: .month, value: -3, to: now)
+            case .ytd: return cal.date(from: cal.dateComponents([.year], from: now))
+            case .y1: return cal.date(byAdding: .year, value: -1, to: now)
+            case .all: return nil
+            }
+        }
+    }
 
     var body: some View {
         let all = state.history.filter { $0.c == state.config.baseCurrency }
-        let range = Self.ranges[min(max(rangeIndex, 0), Self.ranges.count - 1)]
-        let points = range.seconds.map { cutoff in
-            all.filter { $0.date >= Date().addingTimeInterval(-cutoff) }
+        let range = Range(rawValue: rangeID) ?? .all
+        let points = range.start(now: Date()).map { cutoff in
+            all.filter { $0.date >= cutoff }
         } ?? all
 
         return VStack(alignment: .leading, spacing: 8) {
-            Picker("", selection: $rangeIndex) {
-                ForEach(0..<Self.ranges.count, id: \.self) { i in
-                    Text(Self.ranges[i].label).tag(i)
-                }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .controlSize(.small)
+            PillRow(
+                pills: Range.allCases.map { .init($0.rawValue, $0.rawValue) },
+                selection: $rangeID
+            )
 
             if points.count < 2 {
                 emptyState(hasAnyHistory: all.count >= 2)
@@ -233,13 +235,16 @@ struct TrendView: View {
                 chart(points, adjusted: adjusted)
                 if !flows.isEmpty {
                     Text("solid = net worth · dashed = excl. deposits/withdrawals")
-                        .font(.system(size: 9))
+                        .font(Theme.tick)
                         .foregroundStyle(.quaternary)
                 }
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        // 12/8 matches the tab bar above and the Activity tab's filter row — at 14 the
+        // sub-selector sat 2pt inside the tabs it belongs to, which read as misaligned.
+        .padding(.horizontal, 12)
+        .padding(.top, 8)
+        .padding(.bottom, 10)
     }
 
     // Cumulative external flows at each history point, for the deposit-adjusted series.
@@ -310,7 +315,7 @@ struct TrendView: View {
                     } else {
                         Text("\(up ? "▲" : "▼") \(state.money(abs(delta), state.config.baseCurrency)) (\(String(format: "%.2f", abs(pct)))%)")
                             .font(.caption.weight(.semibold))
-                            .foregroundStyle(up ? .green : .red)
+                            .foregroundStyle(up ? Theme.gain : Theme.loss)
                     }
                     Spacer()
                     Text("since \(points.first!.date.formatted(date: .abbreviated, time: .shortened))")
@@ -321,7 +326,7 @@ struct TrendView: View {
                     let growthUp = growth >= 0
                     Text("\(growthUp ? "▲" : "▼") \(state.money(abs(growth), state.config.baseCurrency)) excl. \(state.money(netFlow, state.config.baseCurrency)) net deposits")
                         .font(.caption2)
-                        .foregroundStyle(growthUp ? AnyShapeStyle(Color.green.opacity(0.85)) : AnyShapeStyle(Color.red.opacity(0.85)))
+                        .foregroundStyle(growthUp ? AnyShapeStyle(Theme.gain.opacity(0.85)) : AnyShapeStyle(Theme.loss.opacity(0.85)))
                 }
             }
         }
@@ -333,7 +338,7 @@ struct TrendView: View {
         let hi = values.max() ?? 1
         let pad = max((hi - lo) * 0.18, max(abs(hi) * 0.002, 1))
         let up = (points.last?.v ?? 0) >= (points.first?.v ?? 0)
-        let tint: Color = up ? .green : .red
+        let tint: Color = up ? Theme.gain : Theme.loss
 
         return Chart {
             ForEach(points) { point in
@@ -364,7 +369,7 @@ struct TrendView: View {
                     series: .value("Series", "adjusted")
                 )
                 .interpolationMethod(.monotone)
-                .foregroundStyle(slate.opacity(0.85))
+                .foregroundStyle(Theme.muted.opacity(0.85))
                 .lineStyle(StrokeStyle(lineWidth: 1.3, dash: [4, 3]))
             }
             if let last = points.last, hovered == nil {
@@ -394,7 +399,7 @@ struct TrendView: View {
                 AxisValueLabel {
                     if let v = value.as(Double.self) {
                         Text(state.privacyMode ? "•••" : AppState.compactCurrency(v, code: state.config.baseCurrency))
-                            .font(.system(size: 9))
+                            .font(Theme.tick)
                             .foregroundStyle(.tertiary)
                     }
                 }
@@ -404,7 +409,7 @@ struct TrendView: View {
             AxisMarks(values: .automatic(desiredCount: 4)) { _ in
                 AxisGridLine().foregroundStyle(.quaternary)
                 AxisValueLabel()
-                    .font(.system(size: 9))
+                    .font(Theme.tick)
                     .foregroundStyle(.tertiary)
             }
         }

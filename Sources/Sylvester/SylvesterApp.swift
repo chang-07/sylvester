@@ -10,9 +10,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 @main
-struct SnapBarApp: App {
+struct SylvesterApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var state = AppState()
+
+    // Runs before the StateObject's autoclosure is first evaluated, which matters:
+    // AppState.init reads config and Keychain straight away, and would otherwise cache
+    // an empty result from before the SnapBar data was carried across.
+    init() {
+        LegacyMigration.runIfNeeded()
+    }
 
     var body: some Scene {
         MenuBarExtra {
@@ -21,7 +28,7 @@ struct SnapBarApp: App {
             if let label = state.menuBarImage() {
                 Image(nsImage: label)
             } else {
-                Text("SnapBar")
+                Text("Sylvester")
             }
         }
         .menuBarExtraStyle(.window)
