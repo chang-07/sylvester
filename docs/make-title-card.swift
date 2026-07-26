@@ -26,8 +26,8 @@ cg.drawLinearGradient(bg, start: CGPoint(x: 0, y: h), end: CGPoint(x: w, y: 0), 
 // Subtle teal brand glow behind the lockup.
 let glowC = CGPoint(x: 150, y: h - 250)
 let glow = CGGradient(colorsSpace: space, colors: [
-    NSColor(srgbRed: 0.16, green: 0.60, blue: 0.55, alpha: 0.28).cgColor,
-    NSColor(srgbRed: 0.16, green: 0.60, blue: 0.55, alpha: 0.0).cgColor,
+    NSColor(srgbRed: 0.85, green: 0.83, blue: 0.78, alpha: 0.16).cgColor,
+    NSColor(srgbRed: 0.85, green: 0.83, blue: 0.78, alpha: 0.0).cgColor,
 ] as CFArray, locations: [0, 1])!
 cg.drawRadialGradient(glow, startCenter: glowC, startRadius: 0, endCenter: glowC, endRadius: 300, options: [])
 
@@ -40,17 +40,17 @@ func draw(_ s: String, x: CGFloat, y: CGFloat, size: CGFloat, weight: NSFont.Wei
 // Icon + wordmark lockup (side by side), vertically centered around y = 372.
 let iconSize: CGFloat = 132
 let iconRect = CGRect(x: 82, y: 372 - iconSize / 2, width: iconSize, height: iconSize)
-if let icon = NSImage(contentsOfFile: "icon/AppIcon.iconset/icon_256x256.png") {
+if let icon = NSImage(contentsOfFile: "icon/AppIcon.svg") {
     icon.draw(in: iconRect)
 }
 draw("Sylvester", x: iconRect.maxX + 26, y: 372 - 26, size: 62, weight: .bold, color: .white)
 
-// Teal→gold accent underline (nods to the mark + SnapTrade).
+// Cream accent underline, picking up the icon tile rather than a retired brand colour.
 let accent = CGRect(x: iconRect.maxX + 30, y: 372 - 44, width: 196, height: 7)
 cg.saveGState()
 let accentGrad = CGGradient(colorsSpace: space, colors: [
-    NSColor(srgbRed: 0.20, green: 0.65, blue: 0.60, alpha: 1).cgColor,
-    NSColor(srgbRed: 0.94, green: 0.62, blue: 0.20, alpha: 1).cgColor,
+    NSColor(srgbRed: 0.98, green: 0.97, blue: 0.94, alpha: 1).cgColor,
+    NSColor(srgbRed: 0.98, green: 0.97, blue: 0.94, alpha: 0.15).cgColor,
 ] as CFArray, locations: [0, 1])!
 cg.addPath(CGPath(roundedRect: accent, cornerWidth: 3.5, cornerHeight: 3.5, transform: nil))
 cg.clip()
@@ -65,7 +65,7 @@ draw("macOS menubar app · via SnapTrade · read-only, keys stay on your Mac",
 
 // Screenshot on the right: crop the terminal noise off the bottom, round + shadow.
 if let shot = NSImage(contentsOfFile: "docs/screenshot-raw.png") {
-    let cropBottom: CGFloat = 60   // remove the terminal text at the visual bottom (low y)
+    let cropBottom: CGFloat = 0    // rendered mock — nothing to trim
     let from = CGRect(x: 0, y: cropBottom, width: shot.size.width, height: shot.size.height - cropBottom)
     let destH: CGFloat = 566
     let destW = destH * (from.width / from.height)
