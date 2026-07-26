@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sylvester — your net worth, every brokerage, in the menubar</title>
+<meta name="description" content="Sylvester is a macOS menubar app showing your net worth and per-account breakdown across every brokerage you've linked in SnapTrade. Read-only, local-first, tokens in your Keychain, no server." />
+<link rel="icon" type="image/svg+xml" href="assets/sylvester-logo.svg" />
+<meta property="og:title" content="Sylvester — your net worth, every brokerage, in the menubar" />
+<meta property="og:description" content="A macOS menubar app for net worth across every brokerage you've linked in SnapTrade. Read-only, local-first, no server." />
+<meta property="og:type" content="website" />
+<style>
+:root {
+  --paper:   #FBF8F2;
+  --paper-2: #F1EBDD;
+  --ink:     #17171A;
+  --ink-2:   #3B3B42;
+  --muted:   #7C766C;
+  --line:    #E5DDCC;
+  --line-2:  #D6CBB4;
+  --card:    #FFFFFF;
+  --gain:    #1F8A4C;
+
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+
+  --maxw: 1040px;
+  --gutter: clamp(20px, 5vw, 48px);
+  --shadow: 0 30px 70px -34px rgba(30, 24, 12, .30);
+  --shadow-sm: 0 12px 28px -18px rgba(30, 24, 12, .28);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+body {
+  font-family: var(--sans);
+  color: var(--ink);
+  background: linear-gradient(180deg, var(--paper) 0%, var(--paper-2) 100%);
+  background-attachment: fixed;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+a { color: inherit; }
+.wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 var(--gutter); }
+
+/* ── nav ── */
+.nav {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; padding: 18px var(--gutter); max-width: var(--maxw); margin: 0 auto;
+}
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.brand img { width: 30px; height: 30px; border-radius: 7px; display: block; }
+.brand span { font-weight: 650; letter-spacing: -0.015em; font-size: 17px; }
+.nav-links { display: flex; align-items: center; gap: 22px; font-size: 14px; }
+.nav-links a { color: var(--ink-2); text-decoration: none; }
+.nav-links a:hover { color: var(--ink); }
+.nav-cta {
+  background: var(--ink); color: var(--paper) !important;
+  padding: 7px 15px; border-radius: 999px; font-weight: 550;
+}
+@media (max-width: 620px) { .nav-links a:not(.nav-cta) { display: none; } }
+
+/* ── hero ── */
+.hero { padding: clamp(36px, 7vw, 76px) 0 clamp(40px, 7vw, 84px); }
+.hero-grid {
+  display: grid; grid-template-columns: 1.02fr 0.98fr;
+  gap: clamp(28px, 5vw, 60px); align-items: center;
+}
+.hero-grid > * { min-width: 0; }
+@media (max-width: 860px) { .hero-grid { grid-template-columns: 1fr; } }
+
+.eyebrow {
+  font-size: 12.5px; letter-spacing: .10em; text-transform: uppercase;
+  color: var(--muted); font-weight: 600; margin-bottom: 14px;
+}
+h1 {
+  font-size: clamp(38px, 6.2vw, 60px); line-height: 1.03;
+  letter-spacing: -0.033em; font-weight: 700; margin-bottom: 18px;
+}
+h1 em { font-style: normal; position: relative; white-space: nowrap; }
+h1 em::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: .07em; height: .18em;
+  background: var(--line-2); border-radius: 2px; z-index: -1;
+}
+.hero-sub { font-size: 17.5px; color: var(--ink-2); max-width: 46ch; margin-bottom: 22px; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; margin-bottom: 26px; }
+.chips li {
+  font-size: 12.5px; color: var(--ink-2); background: #fff9;
+  border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px;
+}
+
+.cta-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.btn {
+  display: inline-flex; align-items: center; gap: 8px; text-decoration: none;
+  border-radius: 10px; padding: 12px 20px; font-weight: 600; font-size: 15px;
+  border: 1px solid transparent; transition: transform .12s ease, box-shadow .12s ease;
+}
+.btn:hover { transform: translateY(-1px); }
+.btn-primary { background: var(--ink); color: var(--paper); box-shadow: var(--shadow-sm); }
+.btn-ghost { border-color: var(--line-2); color: var(--ink); background: #fff8; }
+
+.brewline {
+  display: flex; align-items: center; gap: 10px; margin-top: 18px;
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 10px; padding: 11px 13px; max-width: 460px; box-shadow: var(--shadow-sm);
+}
+.brewline code {
+  font-family: var(--mono); font-size: 12.7px; color: var(--ink);
+  /* display:block matters — overflow is ignored on non-replaced inline elements, so as
+     an inline <code> this just widened its flex parent instead of scrolling. */
+  display: block; overflow-x: auto; white-space: nowrap; flex: 1; min-width: 0;
+}
+.copy {
+  border: 1px solid var(--line-2); background: transparent; color: var(--muted);
+  border-radius: 7px; padding: 4px 10px; font-size: 12px; cursor: pointer;
+  font-family: var(--sans); flex-shrink: 0;
+}
+.copy:hover { color: var(--ink); border-color: var(--ink); }
+
+/* ── product mock ── */
+.mock { display: flex; flex-direction: column; align-items: center; gap: 0; }
+.menubar {
+  width: 100%; max-width: 380px; background: #232326; border-radius: 9px 9px 0 0;
+  display: flex; align-items: center; justify-content: flex-end;
+  gap: 14px; padding: 7px 13px; font-size: 12px; color: #E8E8EA;
+}
+.menubar .pill { display: flex; align-items: center; gap: 6px; font-weight: 550; }
+.menubar .pill .up { color: #3ED47A; font-weight: 650; }
+.menubar .dim { color: #9A9AA2; }
+.popover {
+  width: 100%; max-width: 380px; background: var(--card);
+  border: 1px solid var(--line); border-top: none;
+  border-radius: 0 0 13px 13px; box-shadow: var(--shadow); overflow: hidden;
+}
+.pop-head { padding: 14px 15px 12px; border-bottom: 1px solid var(--line); }
+.pop-label { font-size: 11.5px; color: var(--muted); display: flex; justify-content: space-between; }
+.pop-value { font-size: 27px; font-weight: 650; letter-spacing: -0.02em; margin: 2px 0 1px; font-variant-numeric: tabular-nums; }
+.pop-delta { font-size: 12.5px; color: var(--gain); font-weight: 550; font-variant-numeric: tabular-nums; }
+.tabs {
+  display: flex; gap: 2px; margin: 11px 12px 0; padding: 2px;
+  background: #0000000f; border-radius: 8px;
+}
+.tabs span {
+  flex: 1; text-align: center; font-size: 11.5px; padding: 5px 0;
+  border-radius: 6px; color: var(--ink-2);
+}
+.tabs .on { background: var(--ink); color: var(--paper); font-weight: 600; }
+.rows { padding: 10px 15px 15px; }
+.grp {
+  display: flex; justify-content: space-between; font-size: 11.5px;
+  color: var(--muted); font-weight: 650; margin: 9px 0 3px;
+}
+.row { display: flex; justify-content: space-between; align-items: baseline; padding: 4px 0; font-size: 13.5px; }
+.row .sub { display: block; font-size: 10.5px; color: var(--muted); }
+.row .amt { font-variant-numeric: tabular-nums; }
+
+/* ── sections ── */
+section.band { padding: clamp(46px, 7vw, 82px) 0; border-top: 1px solid var(--line); }
+h2 { font-size: clamp(25px, 3.4vw, 33px); letter-spacing: -0.026em; font-weight: 700; margin-bottom: 10px; }
+.lede { color: var(--ink-2); max-width: 58ch; font-size: 16.5px; margin-bottom: 34px; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(248px, 1fr)); gap: 18px; }
+.card {
+  background: var(--card); border: 1px solid var(--line); border-radius: 13px;
+  padding: 20px; box-shadow: var(--shadow-sm);
+}
+.card h3 { font-size: 15.5px; font-weight: 650; margin-bottom: 6px; letter-spacing: -0.012em; }
+.card p { font-size: 14px; color: var(--ink-2); }
+.card .ico {
+  width: 30px; height: 30px; border-radius: 8px; background: var(--paper-2);
+  display: grid; place-items: center; margin-bottom: 13px;
+  border: 1px solid var(--line);
+}
+.card .ico svg { width: 16px; height: 16px; stroke: var(--ink); fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+
+.privacy { background: var(--ink); color: var(--paper); border-radius: 18px; padding: clamp(28px, 4.5vw, 44px); }
+.privacy h2 { color: var(--paper); }
+.privacy .lede { color: #C9C6BE; }
+.privacy ul { list-style: none; display: grid; gap: 14px; }
+.privacy li { display: flex; gap: 12px; align-items: flex-start; font-size: 14.5px; color: #DEDBD4; }
+  .privacy li span { min-width: 0; }
+.privacy li strong { color: var(--paper); font-weight: 620; }
+.privacy .tick { flex-shrink: 0; margin-top: 3px; width: 16px; height: 16px; stroke: #8FD9AC; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+
+.steps { display: grid; gap: 14px; counter-reset: s; max-width: 640px; }
+.step { display: flex; gap: 14px; align-items: flex-start; min-width: 0; }
+.step::before {
+  counter-increment: s; content: counter(s);
+  flex-shrink: 0; width: 25px; height: 25px; border-radius: 50%;
+  background: var(--ink); color: var(--paper); display: grid; place-items: center;
+  font-size: 12.5px; font-weight: 650;
+}
+.step div { font-size: 14.5px; color: var(--ink-2); min-width: 0; flex: 1; }
+.step strong { color: var(--ink); font-weight: 620; }
+pre {
+  max-width: 100%;
+  background: var(--card); border: 1px solid var(--line); border-radius: 9px;
+  padding: 11px 13px; overflow-x: auto; margin-top: 8px;
+}
+pre code { font-family: var(--mono); font-size: 12.5px; }
+.note { font-size: 13.5px; color: var(--muted); margin-top: 22px; max-width: 62ch; }
+
+footer { border-top: 1px solid var(--line); padding: 30px 0 44px; font-size: 13.5px; color: var(--muted); }
+.foot { display: flex; flex-wrap: wrap; gap: 18px; justify-content: space-between; align-items: center; }
+.foot a { color: var(--ink-2); text-decoration: none; }
+.foot a:hover { color: var(--ink); }
+</style>
+</head>
+<body>
+
+<header class="nav">
+  <a class="brand" href="#top">
+    <img src="assets/sylvester-logo.svg" alt="" />
+    <span>Sylvester</span>
+  </a>
+  <nav class="nav-links">
+    <a href="#features">Features</a>
+    <a href="#privacy">Privacy</a>
+    <a href="#install">Install</a>
+    <a class="nav-cta" href="https://github.com/chang-07/sylvester">GitHub</a>
+  </nav>
+</header>
+
+<main id="top">
+
+<section class="hero wrap">
+  <div class="hero-grid">
+    <div>
+      <p class="eyebrow">macOS menubar app</p>
+      <h1>Every brokerage, <em>one number</em>.</h1>
+      <p class="hero-sub">
+        Your net worth and per-account breakdown across every brokerage you've
+        linked in SnapTrade — sitting in your menubar, updating on its own.
+      </p>
+
+      <ul class="chips">
+        <li>Read-only</li>
+        <li>Tokens in your Keychain</li>
+        <li>No server, no telemetry</li>
+        <li>macOS 14+</li>
+      </ul>
+
+      <div class="cta-row">
+        <a class="btn btn-primary" href="https://github.com/chang-07/sylvester/releases/latest">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
+          Download
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/chang-07/sylvester">Source</a>
+      </div>
+
+      <div class="brewline">
+        <code id="brew">brew install --cask chang-07/tap/sylvester</code>
+        <button class="copy" onclick="
+          navigator.clipboard.writeText(document.getElementById('brew').textContent);
+          this.textContent='Copied'; setTimeout(()=>this.textContent='Copy',1400);
+        ">Copy</button>
+      </div>
+    </div>
+
+    <div class="mock" aria-label="Sylvester in the macOS menubar">
+      <div class="menubar">
+        <span class="pill">$4.5k <span class="up">&#9650;0.42%</span> <span class="dim">· Div XEQT</span></span>
+        <span class="dim">Fri 09:41</span>
+      </div>
+      <div class="popover">
+        <div class="pop-head">
+          <div class="pop-label"><span>Net worth</span><span>updated 2 mins ago</span></div>
+          <div class="pop-value">$4,512.80</div>
+          <div class="pop-delta">&#9650; $18.94 (0.42%) today</div>
+        </div>
+        <div class="tabs">
+          <span class="on">Accounts</span><span>Allocation</span><span>Trend</span><span>Activity</span>
+        </div>
+        <div class="rows">
+          <div class="grp"><span>Wealthsimple</span><span>$3.1k</span></div>
+          <div class="row"><span>TFSA<span class="sub">live · synced 4m ago</span></span><span class="amt">$2,190.44</span></div>
+          <div class="row"><span>RRSP<span class="sub">live · synced 4m ago</span></span><span class="amt">$908.12</span></div>
+          <div class="grp"><span>Questrade</span><span>$1.4k</span></div>
+          <div class="row"><span>Margin<span class="sub">live · synced 11m ago</span></span><span class="amt">$1,414.24</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band wrap" id="features">
+  <h2>What it does</h2>
+  <p class="lede">
+    One place for accounts that otherwise live in four different apps, each of
+    which can only ever show you its own slice.
+  </p>
+
+  <div class="grid">
+    <div class="card">
+      <div class="ico"><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8"/><path d="M21 3v6h-6"/></svg></div>
+      <h3>Net worth at a glance</h3>
+      <p>The total lives in your menubar with today's change beside it, in your base currency, converted at live FX rates.</p>
+    </div>
+    <div class="card">
+      <div class="ico"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg></div>
+      <h3>Every account, grouped</h3>
+      <p>Balances by institution, expandable into individual holdings with quantities, prices, day change and open P&amp;L.</p>
+    </div>
+    <div class="card">
+      <div class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3v9l6.4 6.4"/></svg></div>
+      <h3>Real allocation</h3>
+      <p>A donut across <em>all</em> your accounts at once, by asset, account or currency — the view no single brokerage can give you.</p>
+    </div>
+    <div class="card">
+      <div class="ico"><svg viewBox="0 0 24 24"><path d="M3 18l5-6 4 3 4-7 5 5"/></svg></div>
+      <h3>Net worth over time</h3>
+      <p>1D through 1Y, with a second dashed line showing growth excluding your own deposits and withdrawals.</p>
+    </div>
+    <div class="card">
+      <div class="ico"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 1 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></div>
+      <h3>Activity and alerts</h3>
+      <p>Dividends, trades and deposits as they land — quietly. A connection breaking gets a sound and a one-click Reconnect.</p>
+    </div>
+    <div class="card">
+      <div class="ico"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><path d="M3 3l18 18"/></svg></div>
+      <h3>Privacy mode</h3>
+      <p>Blank every figure with one click, so you can screen-share or screenshot without redacting anything by hand.</p>
+    </div>
+  </div>
+</section>
+
+<section class="band wrap" id="privacy">
+  <div class="privacy">
+    <h2>It cannot move your money</h2>
+    <p class="lede">
+      That's not a policy — it's the shape of the connection. Worth being precise about,
+      because you're linking brokerage accounts to something you found on the internet.
+    </p>
+    <ul>
+      <li><svg class="tick" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span><strong>Read-only by construction.</strong> Sign-in uses OAuth2 with PKCE, scoped to <code>read</code>. Placing a trade or moving money isn't something it declines to do — it's something the token can't authorize.</span></li>
+      <li><svg class="tick" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span><strong>There is no Sylvester server.</strong> Your Mac talks to SnapTrade directly. Nothing is relayed through, logged by, or stored on infrastructure belonging to this app, because none exists.</span></li>
+      <li><svg class="tick" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span><strong>Tokens live in your Keychain.</strong> Never written to disk in plaintext, never in the config file, never transmitted anywhere but SnapTrade.</span></li>
+      <li><svg class="tick" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span><strong>No analytics of any kind.</strong> No crash reporting, no usage pings, no accounts. Net-worth history is a JSON file in <code>~/.config/sylvester</code> that only you ever read.</span></li>
+      <li><svg class="tick" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span><strong>The source is right there.</strong> Every claim above is checkable in a few thousand lines of Swift rather than taken on trust.</span></li>
+    </ul>
+  </div>
+</section>
+
+<section class="band wrap" id="install">
+  <h2>Install</h2>
+  <p class="lede">Requires macOS 14 (Sonoma) or later on Apple Silicon, and a free SnapTrade account.</p>
+
+  <div class="steps">
+    <div class="step"><div><strong>Install it.</strong> Via Homebrew, or grab the <code>.dmg</code> from <a href="https://github.com/chang-07/sylvester/releases/latest">Releases</a> and drag it to Applications.
+      <pre><code>brew install --cask chang-07/tap/sylvester</code></pre></div></div>
+    <div class="step"><div><strong>Clear the quarantine flag.</strong> Sylvester is ad-hoc signed rather than notarized, so macOS blocks it once on first open.
+      <pre><code>xattr -dr com.apple.quarantine /Applications/Sylvester.app</code></pre></div></div>
+    <div class="step"><div><strong>Sign in.</strong> Click the menubar icon and follow the four-step setup. Your browser opens to approve read access — there's no key to copy or paste.</div></div>
+    <div class="step"><div><strong>Link a brokerage.</strong> The SnapTrade portal opens; your accounts appear as soon as the connection lands.</div></div>
+  </div>
+
+  <p class="note">
+    Coming from SnapBar? Sylvester is the same app, renamed. Your connection,
+    preferences and net-worth history carry over on first launch — macOS asks
+    once for Keychain access, and your old data is copied rather than moved.
+  </p>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <span>Sylvester — a macOS menubar app. Not affiliated with SnapTrade.</span>
+    <span>
+      <a href="https://github.com/chang-07/sylvester">GitHub</a> ·
+      <a href="https://github.com/chang-07/sylvester/releases/latest">Releases</a> ·
+      <a href="https://snaptrade.com">SnapTrade</a>
+    </span>
+  </div>
+</footer>
+
+</body>
+</html>

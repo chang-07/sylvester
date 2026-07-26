@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  width: 640px; height: 900px; overflow: hidden;
+  font: 13px -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  background: linear-gradient(155deg, #10161c 0%, #0b1014 55%, #131a20 100%);
+  color: #E9E9EC; -webkit-font-smoothing: antialiased;
+}
+.menubar {
+  height: 58px; background: #0000004d; backdrop-filter: blur(20px);
+  display: flex; align-items: center; justify-content: flex-end; gap: 20px;
+  padding: 0 22px; font-size: 19px; color: #E8E8EA;
+  border-bottom: 1px solid #ffffff12;
+}
+.pill { display: flex; align-items: center; gap: 7px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.pill .up { color: #3ED47A; font-weight: 650; }
+.pill .dim { color: #A6A6AE; font-weight: 400; }
+.clock { color: #C9C9D0; font-size: 18px; }
+
+.pop {
+  position: absolute; top: 56px; right: 22px; width: 596px;
+  background: #1F2124; border: 1px solid #ffffff1a; border-radius: 15px;
+  box-shadow: 0 40px 90px -20px #000000cc; overflow: hidden;
+}
+.head { padding: 26px 28px 22px; border-bottom: 1px solid #ffffff12; }
+.hrow { display: flex; justify-content: space-between; align-items: baseline; font-size: 17px; color: #9A9AA2; }
+.val { font-size: 54px; font-weight: 640; letter-spacing: -0.022em; margin: 4px 0 3px; font-variant-numeric: tabular-nums; }
+.delta { font-size: 20px; color: #3ED47A; font-weight: 550; font-variant-numeric: tabular-nums; }
+
+.tabs { display: flex; gap: 3px; margin: 20px 22px 0; padding: 4px; background: #ffffff12; border-radius: 10px; }
+.tabs span { flex: 1; text-align: center; font-size: 18px; padding: 9px 0; border-radius: 7px; color: #C4C4CC; }
+.tabs .on { background: #0A84FF; color: #fff; font-weight: 600; }
+
+.rows { padding: 18px 28px 24px; }
+.grp { display: flex; justify-content: space-between; font-size: 17px; color: #93939B; font-weight: 620; margin: 18px 0 7px; }
+.row { display: flex; justify-content: space-between; align-items: flex-start; padding: 9px 0; font-size: 21px; }
+.row .nm { display: flex; gap: 9px; }
+.chev { color: #6E6E78; font-size: 14px; margin-top: 7px; }
+.sub { display: block; font-size: 15px; color: #82828C; margin-top: 2px; }
+.amt { font-variant-numeric: tabular-nums; }
+
+.hold { padding: 5px 0 5px 32px; display: flex; justify-content: space-between; font-size: 18px; color: #B6B6BE; }
+.hold .t { font-weight: 550; color: #D6D6DC; }
+.hold .s { display: block; font-size: 14.5px; color: #7C7C86; }
+.hold .g { color: #3ED47A; font-size: 14.5px; display: block; }
+.hold .r { display: flex; flex-direction: column; align-items: flex-end; }
+
+.foot { display: flex; gap: 10px; padding: 19px 24px; border-top: 1px solid #ffffff12; align-items: center; }
+.btn { background: #ffffff14; border: 1px solid #ffffff1a; border-radius: 8px; padding: 9px 17px; font-size: 18px; color: #DEDEE4; }
+.dots { margin-left: auto; color: #8A8A94; font-size: 22px; letter-spacing: 2px; }
+</style></head>
+<body>
+  <div class="menubar">
+    <span class="pill">$4.5k <span class="up">&#9650;0.42%</span> <span class="dim">· Div XEQT</span></span>
+    <span class="clock">Fri 09:41</span>
+  </div>
+
+  <div class="pop">
+    <div class="head">
+      <div class="hrow"><span>Net worth</span><span>updated 2 mins ago</span></div>
+      <div class="val">$4,512.80</div>
+      <div class="delta">&#9650; $18.94 (0.42%) today</div>
+    </div>
+    <div class="tabs"><span class="on">Accounts</span><span>Allocation</span><span>Trend</span><span>Activity</span></div>
+    <div class="rows">
+      <div class="grp"><span>Wealthsimple</span><span>$3.1k</span></div>
+      <div class="row"><span class="nm"><span class="chev">&#9660;</span><span>TFSA ••4417<span class="sub">live · feed synced 4m ago</span></span></span><span class="amt">$2,190.44</span></div>
+      <div class="hold"><span><span class="t">XEQT.TO</span><span class="s">38 × $44.12</span></span><span class="r">$1,676.56<span class="g">&#9650;0.51% td</span></span></div>
+      <div class="hold"><span><span class="t">CASH.TO</span><span class="s">20 × $25.19</span></span><span class="r">$503.88<span class="g">&#9650;0.01% td</span></span></div>
+      <div class="hold"><span><span class="t">Cash</span><span class="s">CAD</span></span><span class="r">$10.00</span></div>
+      <div class="row"><span class="nm"><span class="chev">&#9654;</span><span>RRSP ••8820<span class="sub">live · feed synced 4m ago</span></span></span><span class="amt">$908.12</span></div>
+      <div class="grp"><span>Questrade</span><span>$1.4k</span></div>
+      <div class="row"><span class="nm"><span class="chev">&#9654;</span><span>Margin ••2051<span class="sub">live · feed synced 11m ago</span></span></span><span class="amt">$1,414.24</span></div>
+    </div>
+    <div class="foot">
+      <span class="btn">&#8853; Connect Account</span>
+      <span class="btn">&#8635; Refresh</span>
+      <span class="dots">···</span>
+    </div>
+  </div>
+</body></html>
