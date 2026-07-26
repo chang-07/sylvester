@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-13.34 -13.34 146.67 146.67" width="1024" height="1024" aria-label="Sylvester app icon">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FBF8F2"/>
+      <stop offset="1" stop-color="#E2DBCC"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="-6" y="-6" width="132" height="132" rx="30" fill="url(#bg)"/>
+
+  <!-- Whiskers sit outside the head, dark on the light tile, so they actually read -->
+  <g stroke="#17171A" stroke-width="2.3" stroke-linecap="round" fill="none" opacity="0.85">
+    <path d="M13 70 L28 74"/><path d="M11 80 L29 81"/><path d="M14 90 L33 87"/>
+    <path d="M107 70 L92 74"/><path d="M109 80 L91 81"/><path d="M106 90 L87 87"/>
+  </g>
+
+  <!-- Ears -->
+  <path d="M29 57 L29 22 L57 39 Z" fill="#17171A"/>
+  <path d="M91 57 L91 22 L63 39 Z" fill="#17171A"/>
+  <path d="M35 50 L35 31 L51 41 Z" fill="#EDE6D9"/>
+  <path d="M85 50 L85 31 L69 41 Z" fill="#EDE6D9"/>
+
+  <!-- Head -->
+  <path d="M60 30 C81 30 94 45 94 67 C94 89 80 103 60 103 C40 103 26 89 26 67 C26 45 39 30 60 30 Z" fill="#17171A"/>
+
+  <!-- Tuxedo blaze: narrow between the eyes, flaring into the muzzle and chin -->
+  <path d="M60 46 C63 58 64.5 68 64.5 73.5 C74 74.5 80 80 80 87 C80 95 71 100.5 60 100.5 C49 100.5 40 95 40 87 C40 80 46 74.5 55.5 73.5 C55.5 68 57 58 60 46 Z" fill="#FFFFFF"/>
+
+  <!-- Eyes -->
+  <ellipse cx="45" cy="60" rx="10.5" ry="11.5" fill="#FFFFFF"/>
+  <ellipse cx="75" cy="60" rx="10.5" ry="11.5" fill="#FFFFFF"/>
+  <ellipse cx="45.9" cy="61" rx="4.9" ry="6" fill="#17171A"/>
+  <ellipse cx="74.1" cy="61" rx="4.9" ry="6" fill="#17171A"/>
+  <circle cx="47.7" cy="57.4" r="1.9" fill="#FFFFFF"/>
+  <circle cx="75.9" cy="57.4" r="1.9" fill="#FFFFFF"/>
+
+  <!-- Nose + mouth -->
+  <path d="M55.2 78 H64.8 C64.8 84 60 87 60 87 C60 87 55.2 84 55.2 78 Z" fill="#17171A"/>
+  <g stroke="#17171A" stroke-width="1.9" stroke-linecap="round" fill="none">
+    <path d="M60 87 V89.4"/>
+    <path d="M60 89.4 C57 93.4 52.4 92.6 51.2 89.6"/>
+    <path d="M60 89.4 C63 93.4 67.6 92.6 68.8 89.6"/>
+  </g>
+</svg>

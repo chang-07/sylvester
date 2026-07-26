@@ -2,12 +2,12 @@
 import PackageDescription
 
 let package = Package(
-    name: "SnapBar",
+    name: "Sylvester",
     platforms: [.macOS(.v14)],
     targets: [
         .executableTarget(
-            name: "SnapBar",
-            path: "Sources/SnapBar"
+            name: "Sylvester",
+            path: "Sources/Sylvester"
         )
     ]
 )

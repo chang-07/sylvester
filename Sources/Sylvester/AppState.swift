@@ -1,6 +1,70 @@
 import AppKit
 import Foundation
+import ServiceManagement
 import SwiftUI
+import UserNotifications
+
+// A connection queued for removal, pending the inline confirm.
+struct RemovalTarget: Identifiable {
+    let id: String
+    let name: String
+}
+
+// Shared vocabulary for the permissions checklist. macOS grants these through three
+// different APIs with three different vocabularies; the UI only cares about four states.
+enum PermissionStatus {
+    case notRequested
+    case granted
+    case denied
+    // Registered, but macOS wants the user to confirm in System Settings before it counts.
+    case needsApproval
+
+    init(notification: UNAuthorizationStatus) {
+        switch notification {
+        case .authorized, .provisional, .ephemeral: self = .granted
+        case .denied: self = .denied
+        default: self = .notRequested
+        }
+    }
+
+    init(loginItem: SMAppService.Status) {
+        switch loginItem {
+        case .enabled: self = .granted
+        case .requiresApproval: self = .needsApproval
+        // .notFound (bundle not known to Launch Services, e.g. running from a build dir)
+        // stays "not requested" rather than "denied": the Enable button should remain
+        // live, and if registration really can't work the throw surfaces the reason.
+        default: self = .notRequested
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .granted: return "checkmark.circle.fill"
+        case .denied: return "xmark.circle.fill"
+        case .needsApproval: return "exclamationmark.circle.fill"
+        case .notRequested: return "circle.dashed"
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .granted: return .green
+        case .denied: return Theme.alert
+        case .needsApproval: return .orange
+        case .notRequested: return .secondary
+        }
+    }
+
+    var actionTitle: String {
+        switch self {
+        case .granted: return "Enabled"
+        case .denied: return "Open Settings"
+        case .needsApproval: return "Approve"
+        case .notRequested: return "Enable"
+        }
+    }
+}
 
 struct InstitutionGroup: Identifiable {
     var id: String { name }
@@ -27,7 +91,7 @@ final class AppState: ObservableObject {
     }
 
     @Published var phase: Phase = .needsConfig("Loading…")
-    @Published var config: SnapBarConfig = .template
+    @Published var config: SylvesterConfig = .template
     @Published var groups: [InstitutionGroup] = []
     @Published var details: [String: AccountDetail] = [:]
     // Connections with no synced accounts yet (first sync pending, or broken/disabled).
@@ -38,13 +102,19 @@ final class AppState: ObservableObject {
     @Published var activities: [STActivity] = []
     @Published var unseenActivityCount = 0
     @Published var quotes: [String: Quote] = [:]
-    @Published var privacyMode = UserDefaults.standard.bool(forKey: "snapbar.privacy") {
-        didSet { UserDefaults.standard.set(privacyMode, forKey: "snapbar.privacy") }
+    @Published var privacyMode = UserDefaults.standard.bool(forKey: "sylvester.privacy") {
+        didSet { UserDefaults.standard.set(privacyMode, forKey: "sylvester.privacy") }
     }
+    // Popover UI state lives here, NOT as @State in MenuView, for the same reason the
+    // wizard drafts do: the MenuBarExtra window tears down its view (and all its @State)
+    // whenever it loses focus, so an expanded row — or a pending remove confirm — would
+    // silently reset every time you switched to another app and came back.
+    @Published var expandedAccounts: Set<String> = []
+    @Published var removalTarget: RemovalTarget?
     private var seenActivities = SeenActivitiesStore.load()
     private var activitiesLastViewed: TimeInterval {
-        get { UserDefaults.standard.double(forKey: "snapbar.activities.lastViewed") }
-        set { UserDefaults.standard.set(newValue, forKey: "snapbar.activities.lastViewed") }
+        get { UserDefaults.standard.double(forKey: "sylvester.activities.lastViewed") }
+        set { UserDefaults.standard.set(newValue, forKey: "sylvester.activities.lastViewed") }
     }
 
     private var pendingPollTask: Task<Void, Never>?
@@ -80,6 +150,11 @@ final class AppState: ObservableObject {
 
     init() {
         reloadConfig()
+        // Lets the "Reconnect" button on a broken-connection banner open the portal
+        // directly, without routing the user back through the popover.
+        Notifier.shared.onReconnect = { [weak self] authId in
+            Task { @MainActor in await self?.reconnectAuthorization(id: authId) }
+        }
         refreshLoop = Task { [weak self] in
             while !Task.isCancelled {
                 let minutes = self?.config.refreshMinutes ?? 15
@@ -101,7 +176,7 @@ final class AppState: ObservableObject {
 
     // Menubar label pieces: adaptive text on both sides of a color-baked percent image.
     var menuValue: String {
-        guard case .ready = phase else { return "SnapBar" }
+        guard case .ready = phase else { return "Sylvester" }
         return moneyCompact(netWorth, config.baseCurrency)
     }
 
@@ -128,29 +203,39 @@ final class AppState: ObservableObject {
         return suffix.trimmingCharacters(in: .whitespaces)
     }
 
-    // Most recent activity as e.g. "Div XEQT" / "Buy VFV" / "Dep".
+    // Most recent activity, e.g. "Buy XEQT" / "Div XEQT" / "Withdrew".
+    //
+    // Two vocabularies on purpose. With a ticker trailing it, a clipped verb still parses
+    // — "Div XEQT" is unambiguous. Alone it doesn't: "Wd" and "Xfr" were unreadable in the
+    // menubar precisely because there was no ticker to give them context. Those spell out,
+    // and they can afford to — no ticker means the space is already free.
     var latestActivityCompact: String? {
         guard let activity = activities.first else { return nil }
         let type = (activity.type ?? "").uppercased()
-        let short: String
+        // Drop the exchange suffix for menubar brevity (XEQT.TO -> XEQT).
+        let ticker = activity.ticker.map { raw -> String in
+            String((raw.split(separator: ".").first.map(String.init) ?? raw).prefix(6))
+        }
+
+        let clipped: String
+        let spelled: String
         switch type {
-        case "BUY": short = "Buy"
-        case "SELL": short = "Sell"
-        case "DIVIDEND": short = "Div"
-        case "INTEREST": short = "Int"
-        case "REI", "DIVIDEND_REINVESTMENT": short = "DRIP"
-        case "CONTRIBUTION": short = "Dep"
-        case "WITHDRAWAL": short = "Wd"
-        case "FEE", "TAX": short = "Fee"
-        case "TRANSFER": short = "Xfr"
-        default: short = type.isEmpty ? "Act" : String(type.prefix(1) + type.dropFirst().lowercased().prefix(3))
+        case "BUY": clipped = "Buy"; spelled = "Bought"
+        case "SELL": clipped = "Sell"; spelled = "Sold"
+        case "DIVIDEND": clipped = "Div"; spelled = "Dividend"
+        case "REI", "DIVIDEND_REINVESTMENT": clipped = "DRIP"; spelled = "Reinvested"
+        case "INTEREST": clipped = "Int"; spelled = "Interest"
+        case "CONTRIBUTION": clipped = "Dep"; spelled = "Deposit"
+        case "WITHDRAWAL": clipped = "Wd"; spelled = "Withdrew"
+        case "FEE", "TAX": clipped = "Fee"; spelled = "Fee"
+        case "TRANSFER": clipped = "Xfr"; spelled = "Transfer"
+        default:
+            spelled = type.isEmpty
+                ? "Activity"
+                : type.replacingOccurrences(of: "_", with: " ").capitalized
+            clipped = spelled
         }
-        if let ticker = activity.ticker {
-            // Drop exchange suffix for menubar brevity (XEQT.TO -> XEQT).
-            let base = ticker.split(separator: ".").first.map(String.init) ?? ticker
-            return "\(short) \(String(base.prefix(6)))"
-        }
-        return short
+        return ticker.map { "\(clipped) \($0)" } ?? spelled
     }
 
     private var menuImageCache: (key: String, image: NSImage)?
@@ -168,28 +253,31 @@ final class AppState: ObservableObject {
         let isDark = NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
         let change = menuChange
         let suffix = menuSuffix
-        let key = "\(menuValue)|\(change?.text ?? "")|\(change?.up ?? false)|\(suffix)|\(isDark)"
+        // Scale is part of the key: dragging to a display with a different backing factor
+        // has to re-render, or the cached bitmap shows up soft.
+        let scale = NSScreen.main?.backingScaleFactor ?? 2
+        let key = "\(menuValue)|\(change?.text ?? "")|\(change?.up ?? false)|\(suffix)|\(isDark)|\(scale)"
         if let menuImageCache, menuImageCache.key == key { return menuImageCache.image }
 
         let fg: Color = isDark ? .white.opacity(0.92) : .black.opacity(0.88)
-        let up = Color(red: 0.20, green: 0.84, blue: 0.44)
-        let down = Color(red: 1.00, green: 0.32, blue: 0.27)
-        let upLight = Color(red: 0.13, green: 0.60, blue: 0.28)
-        let downLight = Color(red: 0.82, green: 0.18, blue: 0.14)
 
+        // monospacedDigit is load-bearing, not cosmetic: proportional digits change width as
+        // the value ticks, and because the menubar lays out right-to-left every item to our
+        // left slides a pixel or two on every refresh. Fixed-width digits pin it.
         var label = Text(menuValue)
-            .font(.system(size: 13, weight: .medium, design: .rounded))
+            .font(.system(size: 13, weight: .medium, design: .rounded).monospacedDigit())
             .foregroundColor(fg)
         if let change {
-            let tint = isDark ? (change.up ? up : down) : (change.up ? upLight : downLight)
             label = label + Text(" \(change.text)")
-                .font(.system(size: 12, weight: .semibold, design: .rounded))
-                .foregroundColor(tint)
+                .font(.system(size: 12, weight: .semibold, design: .rounded).monospacedDigit())
+                .foregroundColor(change.up ? Theme.bakedGain(dark: isDark) : Theme.bakedLoss(dark: isDark))
         }
         if !suffix.isEmpty {
-            label = label + Text("  \(suffix)")
+            // One space — the suffix already leads with a middot, so a second space just
+            // opened a gap wide enough to read as a separate menubar item.
+            label = label + Text(" \(suffix)")
                 .font(.system(size: 12))
-                .foregroundColor(fg.opacity(0.85))
+                .foregroundColor(fg.opacity(0.8))
         }
 
         // The menubar is translucent and shows the desktop wallpaper, and its tint tracks the
@@ -202,11 +290,31 @@ final class AppState: ObservableObject {
             .padding(.horizontal, 2)
             .padding(.bottom, 1)
         let renderer = ImageRenderer(content: content)
-        renderer.scale = 2
+        // Match the actual display: a hardcoded 2 renders soft on a 3x panel and wastes
+        // pixels on a 1x one.
+        renderer.scale = scale
         guard let image = renderer.nsImage else { return nil }
         image.isTemplate = false
+        // The label is a flat bitmap, so without this VoiceOver announces nothing at all.
+        image.accessibilityDescription = menuBarAccessibilityLabel
         menuImageCache = (key, image)
         return image
+    }
+
+    private var menuBarAccessibilityLabel: String {
+        var parts = ["Net worth \(menuValue)"]
+        if let change = menuChange {
+            let pct = change.text.dropFirst()   // strip the ▲/▼ glyph
+            parts.append("\(change.up ? "up" : "down") \(pct) today")
+        }
+        if !privacyMode, let latest = latestActivityCompact {
+            parts.append("latest activity \(latest)")
+        }
+        if unseenActivityCount > 0 {
+            parts.append("\(unseenActivityCount) unseen")
+        }
+        if errorMessage != nil { parts.append("refresh error") }
+        return parts.joined(separator: ", ")
     }
 
     // MARK: - Privacy-aware formatting
@@ -219,15 +327,43 @@ final class AppState: ObservableObject {
         privacyMode ? "$•••" : Self.compactCurrency(value, code: code)
     }
 
+    // Amounts already stated to be in the base currency — net worth, day change, trend
+    // deltas. These take the bare symbol: NumberFormatter renders USD as "US$3,353.25" on
+    // any non-US locale, which looks wrong on the headline figure and disagrees with the
+    // menubar showing "$3.4k" for that same number. Per-account and per-position rows keep
+    // money()/fullCurrency, where the code genuinely disambiguates CAD from USD.
+    func baseMoney(_ value: Double) -> String {
+        privacyMode ? "$•••••" : Self.baseCurrencyString(value, code: config.baseCurrency)
+    }
+
+    static func baseCurrencyString(_ value: Double, code: String) -> String {
+        let fmt = NumberFormatter()
+        fmt.numberStyle = .decimal
+        fmt.minimumFractionDigits = 2
+        fmt.maximumFractionDigits = 2
+        let magnitude = abs(value)
+        let body = fmt.string(from: NSNumber(value: magnitude)) ?? String(format: "%.2f", magnitude)
+        return (value < 0 ? "-" : "") + currencySymbol(for: code) + body
+    }
+
     // MARK: - Config
 
     func reloadConfig() {
-        SnapBarConfig.ensureExists()
-        guard let cfg = SnapBarConfig.load() else {
-            phase = .needsConfig("Config file is unreadable — fix \(SnapBarConfig.path.path)")
+        SylvesterConfig.ensureExists()
+        guard let cfg = SylvesterConfig.load() else {
+            phase = .needsConfig("Config file is unreadable — fix \(SylvesterConfig.path.path)")
             return
         }
         config = cfg
+        // Anyone already holding a working session predates onboarding — don't walk an
+        // existing install back through a first-run wizard on upgrade. Strictly one-shot:
+        // if this ran on every config reload it would also undo "Run Setup Again".
+        if !UserDefaults.standard.bool(forKey: "sylvester.onboardingMigrated") {
+            UserDefaults.standard.set(true, forKey: "sylvester.onboardingMigrated")
+            if cfg.hasOAuthSession || (cfg.hasPartnerCreds && cfg.hasUser) {
+                onboardingComplete = true
+            }
+        }
         if cfg.mode == .personal {
             // Personal keys don't paste creds — they sign in via OAuth (browser).
             if cfg.hasOAuthSession {
@@ -249,8 +385,8 @@ final class AppState: ObservableObject {
     }
 
     func openConfig() {
-        SnapBarConfig.ensureExists()
-        NSWorkspace.shared.open(SnapBarConfig.path)
+        SylvesterConfig.ensureExists()
+        NSWorkspace.shared.open(SylvesterConfig.path)
     }
 
     @Published var setupBusy = false
@@ -347,6 +483,84 @@ final class AppState: ObservableObject {
         KeychainStore.get("consumerKey") != nil
     }
 
+    // MARK: - Launch at login
+
+    // SMAppService registers the bundle itself, so it needs a real .app — a bare
+    // `swift run` binary has no bundle id and can't be a login item.
+    var canLaunchAtLogin: Bool { Bundle.main.bundleIdentifier != nil }
+
+    @Published var launchAtLogin = SMAppService.mainApp.status == .enabled
+    @Published var launchAtLoginPermission: PermissionStatus =
+        PermissionStatus(loginItem: SMAppService.mainApp.status)
+
+    func setLaunchAtLogin(_ enabled: Bool) {
+        do {
+            if enabled {
+                try SMAppService.mainApp.register()
+            } else {
+                try SMAppService.mainApp.unregister()
+            }
+            errorMessage = nil
+        } catch {
+            errorMessage = "Couldn't \(enabled ? "enable" : "disable") launch at login — \(error.localizedDescription)"
+        }
+        // Re-read rather than trusting the requested value: registration can land in
+        // .requiresApproval, where the toggle is on for us but off until the user says so.
+        let status = SMAppService.mainApp.status
+        launchAtLogin = status == .enabled
+        launchAtLoginPermission = PermissionStatus(loginItem: status)
+        if enabled, status == .requiresApproval {
+            SMAppService.openSystemSettingsLoginItems()
+        }
+    }
+
+    func openLoginItemsSettings() {
+        SMAppService.openSystemSettingsLoginItems()
+    }
+
+    // MARK: - Permissions
+
+    @Published var notificationPermission: PermissionStatus = .notRequested
+
+    func refreshPermissions() async {
+        await Notifier.shared.refreshAuthorization()
+        notificationPermission = PermissionStatus(notification: Notifier.shared.authorization)
+        launchAtLoginPermission = PermissionStatus(loginItem: SMAppService.mainApp.status)
+    }
+
+    func requestNotificationPermission() async {
+        // First ask shows the system prompt; every later one is a silent no-op, so once
+        // denied the only way forward is the Notifications pane.
+        if notificationPermission == .denied {
+            Notifier.shared.openSystemSettings()
+            return
+        }
+        _ = await Notifier.shared.requestAuthorization()
+        await refreshPermissions()
+    }
+
+    // MARK: - Onboarding
+
+    // Four steps: welcome, connect SnapTrade, permissions, link a brokerage.
+    static let onboardingSteps = 4
+
+    @Published var onboardingStep = 0
+    @Published var onboardingComplete = UserDefaults.standard.bool(forKey: "sylvester.onboarded") {
+        didSet { UserDefaults.standard.set(onboardingComplete, forKey: "sylvester.onboarded") }
+    }
+
+    func advanceOnboarding() {
+        if onboardingStep >= Self.onboardingSteps - 1 {
+            onboardingComplete = true
+        } else {
+            onboardingStep += 1
+        }
+    }
+
+    func finishOnboarding() {
+        onboardingComplete = true
+    }
+
     // MARK: - Personal-key OAuth
 
     // Browser sign-in for personal keys: register a public OAuth client once, run the
@@ -361,7 +575,7 @@ final class AppState: ObservableObject {
             if let existing = config.oauthClientId, !existing.isEmpty {
                 clientId = existing
             } else {
-                clientId = try await oauth.registerClient(clientName: "SnapBar")
+                clientId = try await oauth.registerClient(clientName: "Sylvester")
                 config.oauthClientId = clientId
             }
             let tokens = try await oauth.authorize(clientId: clientId)
@@ -380,6 +594,12 @@ final class AppState: ObservableObject {
             errorMessage = nil
             phase = .ready
             dismissSetup()
+            // Mid-onboarding this is step 2 clearing, not the end of setup — move to the
+            // permissions step rather than dropping the user into the dashboard.
+            if !onboardingComplete, onboardingStep <= 1 {
+                onboardingStep = 2
+                await refreshPermissions()
+            }
             await refresh()
         } catch {
             errorMessage = error.localizedDescription
@@ -407,6 +627,7 @@ final class AppState: ObservableObject {
     }
 
     func signOutPersonal() {
+        cancelConnectWatch()
         config.clearOAuthSession()
         try? config.save()
         groups = []
@@ -422,7 +643,7 @@ final class AppState: ObservableObject {
         guard config.hasPartnerCreds else { return }
         do {
             let userId = config.userId.isEmpty
-                ? "snapbar-\(UUID().uuidString.prefix(8).lowercased())"
+                ? "sylvester-\(UUID().uuidString.prefix(8).lowercased())"
                 : config.userId
             let resp = try await client.registerUser(userId: userId)
             config.userId = resp.userId
@@ -436,15 +657,111 @@ final class AppState: ObservableObject {
         }
     }
 
+    // MARK: - Connect
+
+    // True from the moment the portal opens until a connection shows up (or we give up).
+    @Published var awaitingConnection = false
+    private var connectWatchTask: Task<Void, Never>?
+
     // Opens the SnapTrade connection portal in the browser to link a brokerage.
     func connectAccount() async {
         do {
+            let before = await currentAuthorizations()
             let url = try await client.connectURL(userId: config.userId, userSecret: config.userSecret)
             NSWorkspace.shared.open(url)
             errorMessage = nil
+            watchForConnectionChange(
+                knownIds: Set(before.map(\.id)),
+                disabledIds: Set(before.filter { $0.disabled == true }.map(\.id))
+            )
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    private func currentAuthorizations() async -> [STAuthorization] {
+        (try? await client.listAuthorizations(
+            userId: config.userId, userSecret: config.userSecret)) ?? []
+    }
+
+    // The portal is a browser round-trip with no callback, so nothing tells us when the
+    // user is done. Without this, a finished connection only surfaces when the popover is
+    // next reopened — and schedulePendingPoll() can't cover it, because it only schedules
+    // itself once a pending connection is already visible.
+    //
+    // So poll for the authorization itself. That record appears the moment the portal
+    // completes — minutes before the first holdings sync lands — which is exactly what's
+    // worth showing: the brokerage name, listed, syncing.
+    private func watchForConnectionChange(knownIds: Set<String>, disabledIds: Set<String>) {
+        connectWatchTask?.cancel()
+        awaitingConnection = true
+        connectWatchTask = Task { [weak self] in
+            // Backs off 2s -> 10s and gives up after ~4 minutes, so a portal tab that got
+            // abandoned doesn't leave us polling for the rest of the session.
+            var delay = 2.0
+            var elapsed = 0.0
+            while elapsed < 240 {
+                try? await Task.sleep(for: .seconds(delay))
+                elapsed += delay
+                delay = min(delay * 1.4, 10)
+                guard !Task.isCancelled, let self else { return }
+                guard case .ready = phase else { continue }
+
+                let auths = await currentAuthorizations()
+                let appeared = auths.contains { !knownIds.contains($0.id) }
+                // A reconnect reuses the existing id, so watch for revival too.
+                let revived = auths.contains { disabledIds.contains($0.id) && $0.disabled != true }
+                if appeared || revived {
+                    await connectionDetected()
+                    return
+                }
+            }
+            self?.awaitingConnection = false
+        }
+    }
+
+    private func connectionDetected() async {
+        awaitingConnection = false
+        connectWatchTask = nil
+        // Pulls the connection into the list right away — it renders as the brokerage name
+        // with "first sync running…", rather than nothing at all for several minutes.
+        await refresh(fullDetails: false)
+        // This is onboarding's last step; finishing drops the user straight into the
+        // dashboard with their new connection already showing.
+        if !onboardingComplete { finishOnboarding() }
+    }
+
+    // Posts one of each kind so both paths can be checked in a single click: the routine
+    // one is passive and silent with the three-line layout, the attention one plays a
+    // sound and carries the Reconnect button. They also carry different thread ids, so in
+    // Notification Center they should file into two separate groups rather than one.
+    func sendTestNotifications() async {
+        let stamp = Int(Date().timeIntervalSince1970)
+        Notifier.shared.post(
+            id: "test-activity-\(stamp)",
+            title: "Dividend · VFV",
+            subtitle: money(12.34, config.baseCurrency),
+            body: "Example account · test notification",
+            kind: .activity
+        )
+        // Use a real authorization id when there is one, so Reconnect genuinely exercises
+        // the action handler rather than just rendering a button that does nothing.
+        var authId = attentionConnections.first?.id
+        if authId == nil { authId = await currentAuthorizations().first?.id }
+        Notifier.shared.post(
+            id: "test-attention-\(stamp)",
+            title: "Example connection disconnected",
+            subtitle: "Test only — nothing is actually broken",
+            body: "Reconnect opens the SnapTrade portal for a real connection.",
+            kind: .attention,
+            authorizationId: authId
+        )
+    }
+
+    func cancelConnectWatch() {
+        connectWatchTask?.cancel()
+        connectWatchTask = nil
+        awaitingConnection = false
     }
 
     func refresh(fullDetails: Bool = true) async {
@@ -486,8 +803,11 @@ final class AppState: ObservableObject {
                 for auth in auths where auth.disabled == true && !known.contains(auth.id) {
                     Notifier.shared.post(
                         id: "broken-\(auth.id)",
-                        title: "\(auth.displayName) connection broken",
-                        body: "Open SnapBar to reconnect."
+                        title: "\(auth.displayName) disconnected",
+                        subtitle: "Sylvester can't refresh its accounts",
+                        body: "Reconnect to resume syncing balances and activity.",
+                        kind: .attention,
+                        authorizationId: auth.id
                     )
                 }
             }
@@ -531,6 +851,9 @@ final class AppState: ObservableObject {
             }
             .sorted { $0.totalInBase > $1.totalInBase }
         netWorth = groups.reduce(0) { $0 + $1.totalInBase }
+        // Expansion state outlives the view now, so drop rows that no longer exist
+        // (connection removed, account closed) instead of holding their ids forever.
+        expandedAccounts.formIntersection(Set(effective.map(\.id)))
     }
 
     // Event-driven refresh when the user reopens the popover (e.g. after finishing a browser
@@ -660,29 +983,40 @@ final class AppState: ObservableObject {
     }
 
     // One notification per genuinely-new activity; a digest when several land at once.
+    // Routine money movement is posted passively — it belongs in Notification Center, not
+    // in front of whatever you're doing.
     private func notifyNewActivities(_ fresh: [STActivity]) {
         guard !fresh.isEmpty else { return }
         if fresh.count > 3 {
-            let summary = fresh.prefix(4)
+            let listed = fresh.prefix(4)
                 .map { ActivityFeedView.title(for: $0, privacy: privacyMode) }
                 .joined(separator: " · ")
+            let remainder = fresh.count - 4
+            // The net figure is the one thing a digest can say that the individual
+            // notifications can't — four trades that cancel out is a different morning
+            // from four that don't.
+            let net = fx.map { converter in
+                fresh.reduce(0.0) { $0 + converter.toBase($1.amount ?? 0, from: $1.currencyCode) }
+            }
             Notifier.shared.post(
                 id: "acts-\(Int(Date().timeIntervalSince1970))",
-                title: "\(fresh.count) new account activities",
-                body: summary
+                title: "\(fresh.count) new activities",
+                subtitle: net.map { "net \($0 >= 0 ? "+" : "")\(baseMoney($0))" } ?? "",
+                body: remainder > 0 ? "\(listed) · +\(remainder) more" : listed,
+                kind: .activity
             )
             return
         }
         for activity in fresh {
-            var parts: [String] = []
-            if let account = activity.account?.name { parts.append(account) }
-            if let amount = activity.amount, amount != 0 {
-                parts.append(money(amount, activity.currencyCode))
-            }
+            // Amount on the subtitle line, account on the body: macOS renders all three,
+            // and the amount is what you actually want to read at a glance.
+            let amount = activity.amount ?? 0
             Notifier.shared.post(
                 id: "act-\(activity.id)",
                 title: ActivityFeedView.title(for: activity, privacy: privacyMode),
-                body: parts.joined(separator: " · ")
+                subtitle: amount != 0 ? money(amount, activity.currencyCode) : "",
+                body: activity.account?.name ?? activity.account?.institutionName ?? "",
+                kind: .activity
             )
         }
     }
@@ -705,11 +1039,24 @@ final class AppState: ObservableObject {
     }
 
     func reconnect(_ auth: STAuthorization) async {
+        await reconnectAuthorization(id: auth.id)
+    }
+
+    // Takes a bare id so a notification action — which only carries the id in userInfo,
+    // not the whole authorization — can drive the same flow as the in-app button.
+    func reconnectAuthorization(id: String) async {
         do {
+            let before = await currentAuthorizations()
             let url = try await client.connectURL(
-                userId: config.userId, userSecret: config.userSecret, reconnect: auth.id)
+                userId: config.userId, userSecret: config.userSecret, reconnect: id)
             NSWorkspace.shared.open(url)
             errorMessage = nil
+            // Same browser round-trip, same lack of a callback — watch for the revival
+            // rather than making the user come back and check.
+            watchForConnectionChange(
+                knownIds: Set(before.map(\.id)),
+                disabledIds: Set(before.filter { $0.disabled == true }.map(\.id))
+            )
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -855,8 +1202,42 @@ final class AppState: ObservableObject {
 
     // MARK: - Formatting
 
+    private static var symbolCache: [String: String] = [:]
+
+    // Compact prefix for the menubar and chart axes. NumberFormatter's currencySymbol
+    // property tracks the *locale*, not the currencyCode you set — so render a sentinel
+    // and strip it to get the symbol for an arbitrary code (GBP -> "£", not "GBP ").
+    static func currencySymbol(for code: String) -> String {
+        if let cached = symbolCache[code] { return cached }
+        let symbol: String
+        switch code {
+        // The dollar family all render as "$": the base currency is stated once in the
+        // UI, so the prefix doesn't have to disambiguate them, and "CA$12.3k" in a
+        // menubar is noise.
+        case "USD", "CAD", "AUD", "NZD", "SGD", "HKD":
+            symbol = "$"
+        default:
+            let fmt = NumberFormatter()
+            fmt.numberStyle = .currency
+            fmt.currencyCode = code
+            // Pin the locale so the symbol stays a prefix regardless of system region.
+            fmt.locale = Locale(identifier: "en_US")
+            fmt.minimumFractionDigits = 0
+            fmt.maximumFractionDigits = 0
+            let raw = (fmt.string(from: 0) ?? code)
+                .replacingOccurrences(of: "0", with: "")
+                .trimmingCharacters(in: .whitespaces)
+            let resolved = raw.isEmpty ? code : raw
+            // Alphabetic fallbacks (CHF, or an unrecognized code echoed back) need a
+            // space so they don't run into the number.
+            symbol = resolved.last?.isLetter == true ? "\(resolved) " : resolved
+        }
+        symbolCache[code] = symbol
+        return symbol
+    }
+
     static func compactCurrency(_ value: Double, code: String) -> String {
-        let symbol = code == "USD" || code == "CAD" ? "$" : (code == "EUR" ? "€" : "\(code) ")
+        let symbol = currencySymbol(for: code)
         let v = abs(value)
         let body: String
         switch v {

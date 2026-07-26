@@ -2,7 +2,7 @@ import SwiftUI
 
 struct ActivityFeedView: View {
     @ObservedObject var state: AppState
-    @AppStorage("snapbar.activity.filter") private var filter = 0
+    @AppStorage("sylvester.activity.filter") private var filter = 0
 
     private static let filters = ["All", "Trades", "Income", "Cash"]
 
@@ -43,14 +43,10 @@ struct ActivityFeedView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Picker("", selection: $filter) {
-                ForEach(0..<Self.filters.count, id: \.self) { i in
-                    Text(Self.filters[i]).tag(i)
-                }
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .controlSize(.small)
+            PillRow(
+                pills: (0..<Self.filters.count).map { .init($0, Self.filters[$0]) },
+                selection: $filter
+            )
             .padding(.horizontal, 12)
             .padding(.top, 8)
 

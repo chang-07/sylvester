@@ -1,33 +1,39 @@
 import SwiftUI
 
-private struct RemovalTarget: Identifiable {
-    let id: String
-    let name: String
-}
-
 struct MenuView: View {
     @ObservedObject var state: AppState
-    @State private var expanded: Set<String> = []
-    @State private var removalTarget: RemovalTarget?
-    @AppStorage("snapbar.tab") private var tab = 0
+    // Expanded rows and the pending remove confirm live on AppState — see the note there;
+    // @State here is wiped every time the popover loses focus.
+    @AppStorage("sylvester.tab") private var tab = 0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            switch state.phase {
-            case .needsConfig(let message):
-                setupView(message)
-            case .ready:
-                if state.showSetup {
-                    setupView("")
-                } else {
-                    readyView
+            // Onboarding owns the window until it's done — including the key wizard, which
+            // it can push for the advanced partner-key path.
+            if !state.onboardingComplete && !state.showSetup {
+                OnboardingView(state: state)
+            } else {
+                switch state.phase {
+                case .needsConfig(let message):
+                    setupView(message)
+                case .ready:
+                    if state.showSetup {
+                        setupView("")
+                    } else {
+                        readyView
+                    }
                 }
             }
         }
         .frame(width: 340)
         // Refresh when the popover opens (throttled) — event-driven pickup after a reconnect,
         // no background polling. No-op unless ready + stale or a connection needs attention.
-        .onAppear { Task { await state.refreshOnReopen() } }
+        .onAppear {
+            Task { await state.refreshOnReopen() }
+            // Permissions can change in System Settings while we're not looking, and the
+            // ⋯ menu renders off this state.
+            Task { await state.refreshPermissions() }
+        }
     }
 
     // MARK: - Setup
@@ -41,7 +47,7 @@ struct MenuView: View {
 
     private func setupView(_ message: String) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label("Set up SnapBar", systemImage: "gearshape")
+            Label("Set up Sylvester", systemImage: "gearshape")
                 .font(.headline)
             Text("Connect your SnapTrade account. Everything stays on this Mac — tokens in the Keychain, data pulled straight from the SnapTrade API.")
                 .font(.caption)
@@ -174,18 +180,18 @@ struct MenuView: View {
                     .padding(.horizontal, 12)
                     .padding(.top, 6)
             }
-            if let target = removalTarget {
+            if let target = state.removalTarget {
                 removalConfirm(target)
             }
-            Picker("", selection: $tab) {
-                Text("Accounts").tag(0)
-                Text("Allocation").tag(1)
-                Text("Trend").tag(2)
-                Text(state.unseenActivityCount > 0 ? "Activity •" : "Activity").tag(3)
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .controlSize(.small)
+            SegmentedBar(
+                segments: [
+                    .init(0, "Accounts"),
+                    .init(1, "Allocation"),
+                    .init(2, "Trend"),
+                    .init(3, "Activity", dot: state.unseenActivityCount > 0),
+                ],
+                selection: $tab
+            )
             .padding(.horizontal, 12)
             .padding(.top, 8)
 
@@ -226,8 +232,8 @@ struct MenuView: View {
                 .buttonStyle(.plain)
                 .help(state.privacyMode ? "Show amounts" : "Hide amounts (for screenshots)")
             }
-            Text(state.money(state.netWorth, state.config.baseCurrency))
-                .font(.system(size: 26, weight: .semibold, design: .rounded))
+            Text(state.baseMoney(state.netWorth))
+                .font(Theme.hero)
                 .monospacedDigit()
             headerDeltaChip
         }
@@ -237,22 +243,15 @@ struct MenuView: View {
     // Prefer live market day-change (vs yesterday's close); fall back to snapshot delta.
     @ViewBuilder
     private var headerDeltaChip: some View {
-        if let day = state.marketDayChange {
-            let flat = abs(day.delta) < 0.01
-            let up = day.delta >= 0
-            Text(flat
-                ? "flat today"
-                : "\(up ? "▲" : "▼") \(state.money(abs(day.delta), state.config.baseCurrency)) (\(String(format: "%.2f", abs(day.pct)))%) today")
-                .font(.caption.weight(flat ? .regular : .medium))
-                .foregroundStyle(flat ? AnyShapeStyle(.secondary) : AnyShapeStyle(up ? Color.green : Color.red))
-        } else if let change = state.sessionDelta {
+        if let change = state.marketDayChange ?? state.sessionDelta {
             let flat = abs(change.delta) < 0.01
             let up = change.delta >= 0
             Text(flat
                 ? "flat today"
-                : "\(up ? "▲" : "▼") \(state.money(abs(change.delta), state.config.baseCurrency)) (\(String(format: "%.2f", abs(change.pct)))%) today")
-                .font(.caption.weight(flat ? .regular : .medium))
-                .foregroundStyle(flat ? AnyShapeStyle(.secondary) : AnyShapeStyle(up ? Color.green : Color.red))
+                : "\(up ? "▲" : "▼") \(state.baseMoney(abs(change.delta))) (\(String(format: "%.2f", abs(change.pct)))%) today")
+                .font(Theme.label.weight(flat ? .regular : .medium))
+                .monospacedDigit()
+                .foregroundStyle(flat ? AnyShapeStyle(.secondary) : AnyShapeStyle(up ? Theme.gain : Theme.loss))
         }
     }
 
@@ -283,6 +282,14 @@ struct MenuView: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .controlSize(.small)
+                        if state.awaitingConnection {
+                            HStack(spacing: 6) {
+                                ProgressView().controlSize(.small)
+                                Text("Watching for the connection…")
+                                    .font(Theme.micro)
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
                     }
                     .padding(.vertical, 14)
                     .padding(.horizontal, 8)
@@ -309,11 +316,11 @@ struct MenuView: View {
                 .fixedSize(horizontal: false, vertical: true)
             HStack {
                 Spacer()
-                Button("Cancel") { removalTarget = nil }
+                Button("Cancel") { state.removalTarget = nil }
                     .controlSize(.small)
                 Button("Remove") {
                     let id = target.id
-                    removalTarget = nil
+                    state.removalTarget = nil
                     Task { await state.removeConnection(id: id) }
                 }
                 .controlSize(.small)
@@ -363,7 +370,7 @@ struct MenuView: View {
                 ProgressView().controlSize(.mini)
             }
             Button {
-                removalTarget = RemovalTarget(id: auth.id, name: auth.displayName)
+                state.removalTarget = RemovalTarget(id: auth.id, name: auth.displayName)
             } label: {
                 Image(systemName: "xmark.circle.fill")
                     .foregroundStyle(.tertiary)
@@ -377,17 +384,18 @@ struct MenuView: View {
     // Picker + donut + one legend row per slice; explicit so the window can size itself.
     private var allocationHeight: CGFloat {
         let sliceCount = state.allocation(
-            by: .init(rawValue: UserDefaults.standard.string(forKey: "snapbar.allocation.dim") ?? "") ?? .asset
+            by: .init(rawValue: UserDefaults.standard.string(forKey: "sylvester.allocation.dim") ?? "") ?? .asset
         ).count
         guard sliceCount > 0 else { return 200 }
-        return 24 + 155 + CGFloat(sliceCount) * 21 + 44
+        // top pad + pill row + gap + donut + gap + legend rows + bottom pad
+        return 8 + ControlMetrics.pillRow + 10 + 155 + 10 + CGFloat(sliceCount) * 21 + 10
     }
 
     private var activityHeight: CGFloat {
         guard !state.activities.isEmpty else { return 170 }
         // Filter picker + one day-header per ~4 rows + row heights, capped and scrollable beyond.
         let rows = CGFloat(state.activities.count)
-        return min(rows * 36 + (rows / 4 + 1) * 24 + 48, 380)
+        return min(rows * 36 + (rows / 4 + 1) * 24 + 8 + ControlMetrics.pillRow + 16, 380)
     }
 
     private var listHeight: CGFloat {
@@ -397,7 +405,7 @@ struct MenuView: View {
         var height = CGFloat(state.groups.count) * 26 + CGFloat(accountCount) * 38
             + CGFloat(attentionCount) * 40 + 20
         for group in state.groups {
-            for account in group.accounts where expanded.contains(account.id) {
+            for account in group.accounts where state.expandedAccounts.contains(account.id) {
                 let detail = state.details[account.id]
                 let rows = (detail?.positions.count ?? 0) + (detail?.cashByCurrency.count ?? 0)
                 height += CGFloat(max(rows, 1)) * 30 + 8
@@ -426,10 +434,14 @@ struct MenuView: View {
     }
 
     private func accountRow(_ account: STAccount) -> some View {
-        let isExpanded = expanded.contains(account.id)
+        let isExpanded = state.expandedAccounts.contains(account.id)
         return VStack(alignment: .leading, spacing: 0) {
             Button {
-                if isExpanded { expanded.remove(account.id) } else { expanded.insert(account.id) }
+                if isExpanded {
+                    state.expandedAccounts.remove(account.id)
+                } else {
+                    state.expandedAccounts.insert(account.id)
+                }
             } label: {
                 HStack(alignment: .firstTextBaseline) {
                     Image(systemName: "chevron.right")
@@ -459,7 +471,7 @@ struct MenuView: View {
             .contextMenu {
                 if let authId = account.brokerageAuthorization {
                     Button(role: .destructive) {
-                        removalTarget = RemovalTarget(
+                        state.removalTarget = RemovalTarget(
                             id: authId,
                             name: "\(account.institutionName ?? account.displayName) connection"
                         )
@@ -607,6 +619,12 @@ struct MenuView: View {
             Spacer()
             Menu {
                 Button(state.privacyMode ? "Show Amounts" : "Hide Amounts") { state.privacyMode.toggle() }
+                if state.canLaunchAtLogin {
+                    Toggle("Launch at Login", isOn: Binding(
+                        get: { state.launchAtLogin },
+                        set: { state.setLaunchAtLogin($0) }
+                    ))
+                }
                 Divider()
                 if state.config.mode == .personal {
                     Button("Sign Out of SnapTrade") { state.signOutPersonal() }
@@ -618,13 +636,26 @@ struct MenuView: View {
                 }
                 Button("Open Config") { state.openConfig() }
                 Button("Reload Config") { state.reloadConfig() }
+                // Also the only way to see the first-run flow again without signing out.
+                Button("Run Setup Again…") {
+                    state.onboardingStep = 0
+                    state.onboardingComplete = false
+                }
+                // Reflect the real authorization state. Offering "Test Notification" to a
+                // user who denied the permission produces a button that does nothing, with
+                // no hint as to why.
                 if Notifier.shared.available {
-                    Button("Test Notification") {
-                        Notifier.shared.post(
-                            id: "test-\(Int(Date().timeIntervalSince1970))",
-                            title: "SnapBar notifications work",
-                            body: "You'll get one when a dividend, trade, or deposit lands."
-                        )
+                    switch state.notificationPermission {
+                    case .granted:
+                        Button("Send Test Notifications") {
+                            Task { await state.sendTestNotifications() }
+                        }
+                    case .denied:
+                        Button("Notifications Are Off…") { Notifier.shared.openSystemSettings() }
+                    default:
+                        Button("Turn On Notifications…") {
+                            Task { await state.requestNotificationPermission() }
+                        }
                     }
                 }
                 Divider()
@@ -646,6 +677,6 @@ struct MenuView: View {
     }
 
     private var quitButton: some View {
-        Button("Quit SnapBar") { NSApplication.shared.terminate(nil) }
+        Button("Quit Sylvester") { NSApplication.shared.terminate(nil) }
     }
 }
