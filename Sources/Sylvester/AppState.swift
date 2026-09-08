@@ -369,13 +369,21 @@ final class AppState: ObservableObject {
             if cfg.hasOAuthSession {
                 phase = .ready
                 Task { await refresh() }
+            } else if cfg.hasPartnerCreds && cfg.hasUser {
+                // Stranded state from older builds: signed out of OAuth while holding
+                // working partner creds (the key wizard used to leave authMode as
+                // "personal", walling off the keys on relaunch). Heal it.
+                config.authMode = AuthMode.partner.rawValue
+                try? config.save()
+                phase = .ready
+                Task { await refresh() }
             } else {
-                phase = .needsConfig("Sign in with SnapTrade to connect your personal key.")
+                phase = .needsConfig("Sign in with SnapTrade to get started.")
             }
             return
         }
         if !cfg.hasPartnerCreds {
-            phase = .needsConfig("Add clientId + consumerKey to config, then reload.")
+            phase = .needsConfig("Sign in with SnapTrade, or add a partner API key under Advanced.")
         } else if !cfg.hasUser {
             phase = .needsConfig("Partner creds OK. Register a SnapTrade user (or paste an existing userId/userSecret into config).")
         } else {
@@ -450,6 +458,8 @@ final class AppState: ObservableObject {
         config.consumerKey = key
         config.userId = userId.trimmingCharacters(in: .whitespacesAndNewlines)
         config.userSecret = userSecret.trimmingCharacters(in: .whitespacesAndNewlines)
+        // The explicit mode write is what makes the switch stick across relaunches.
+        config.authMode = AuthMode.partner.rawValue
         KeychainStore.set("consumerKey", key)   // activates keychain mode before save
         do {
             try config.save()
@@ -457,6 +467,15 @@ final class AppState: ObservableObject {
             errorMessage = "Couldn't save config: \(error.localizedDescription)"
             return
         }
+        // Partner keys replace any personal OAuth session — revoke it server-side like a
+        // sign-out would, then drop it locally. Only after the save: clearing deletes the
+        // Keychain tokens, and a failed save must not cost the user their working session.
+        // The generation bump fences out any refresh in flight, which would otherwise
+        // re-persist rotated tokens into the Keychain after the wipe.
+        revokePersonalSessionServerSide()
+        oauthSessionGeneration += 1
+        config.clearOAuthSession()
+        try? config.save()
         errorMessage = nil
 
         if config.hasUser {
@@ -563,22 +582,56 @@ final class AppState: ObservableObject {
 
     // MARK: - Personal-key OAuth
 
-    // Browser sign-in for personal keys: register a public OAuth client once, run the
-    // authorization-code flow, and store the bearer + refresh tokens. No key paste — the
-    // dashboard login resolves the personal partner + user on the server.
+    // Browser sign-in for personal keys: identify as the shipped release client (or
+    // register a public OAuth client once), run the authorization-code flow, and store the
+    // bearer + refresh tokens. No key paste — the dashboard login resolves the personal
+    // partner + user on the server.
     func signInWithSnapTrade() async {
         setupBusy = true
         defer { setupBusy = false }
         let oauth = makeOAuthClient()
         do {
-            let clientId: String
+            var freshlyRegistered = false
+            var clientId: String
             if let existing = config.oauthClientId, !existing.isEmpty {
                 clientId = existing
+            } else if config.apiBaseURL == nil, !OAuthClient.releaseClientId.isEmpty {
+                // The pre-registered client only exists on prod; overridden hosts
+                // (staging) still get their own registration below.
+                clientId = OAuthClient.releaseClientId
             } else {
                 clientId = try await oauth.registerClient(clientName: "Sylvester")
+                // Remembered AND persisted immediately, so an abandoned browser tab —
+                // or a quit-and-relaunch — doesn't register another client every retry.
                 config.oauthClientId = clientId
+                try? config.save()
+                freshlyRegistered = true
             }
-            let tokens = try await oauth.authorize(clientId: clientId)
+            // A purged remembered id fails inside the browser (no redirect back), which
+            // the app can't observe — so probe first and re-register instead of hanging.
+            // Never while a session is live: refresh still working proves the id, and a
+            // probe false-positive must not swap the client id out from under it.
+            if !freshlyRegistered, !config.hasOAuthSession, await oauth.clientLooksInvalid(clientId: clientId) {
+                clientId = try await oauth.registerClient(clientName: "Sylvester")
+                config.oauthClientId = clientId
+                try? config.save()
+                freshlyRegistered = true
+            }
+            let tokens: OAuthClient.Tokens
+            do {
+                tokens = try await oauth.authorize(clientId: clientId)
+            } catch let error as OAuthClient.OAuthError where error.isInvalidClient && !freshlyRegistered {
+                // Backstop for a registration purged mid-flow (surfaces at token exchange).
+                clientId = try await oauth.registerClient(clientName: "Sylvester")
+                config.oauthClientId = clientId
+                try? config.save()
+                tokens = try await oauth.authorize(clientId: clientId)
+            }
+            // The old session (if any) ends here — fence out any refresh in flight so a
+            // stale verdict can't tear down or overwrite the tokens stored below.
+            oauthSessionGeneration += 1
+            // Persisted even for the release client id: token refresh reads it from config.
+            config.oauthClientId = clientId
             config.authMode = AuthMode.personal.rawValue
             config.accessToken = tokens.accessToken
             config.refreshToken = tokens.refreshToken
@@ -606,28 +659,111 @@ final class AppState: ObservableObject {
         }
     }
 
-    // Refresh the access token when missing/near expiry. false => unrecoverable (re-sign-in).
-    private func ensureFreshTokenIfNeeded() async -> Bool {
-        guard config.mode == .personal else { return true }
+    // A failed token refresh is not one condition: a dead grant means the user is signed
+    // out, but a network blip means the session is fine and merely unreachable — showing
+    // "sign in again" to a laptop that just woke without Wi-Fi is wrong.
+    private enum TokenRefreshOutcome {
+        case ok
+        case transient(String)   // keep the session and any on-screen data
+        case signedOut           // the grant itself is dead — re-auth required
+        case superseded          // the session changed mid-refresh — result is void
+    }
+
+    private var tokenRefreshTask: Task<TokenRefreshOutcome, Never>?
+    // Bumped whenever the OAuth session is replaced or cleared (sign-out, partner
+    // switch, fresh sign-in, dead-grant cleanup). A refresh that started against an
+    // older generation must not persist its tokens or apply its verdict — refresh
+    // tokens rotate, so a stale success would resurrect a session the user just
+    // ended, and a stale failure would tear down one they just established.
+    private var oauthSessionGeneration = 0
+
+    // Refresh the access token when missing/near expiry. Single-flight: refresh tokens
+    // ROTATE, so two concurrent refresh grants double-spend the same token and the loser's
+    // 400 would read as a dead session — every caller joins the in-flight refresh instead.
+    // (Safe on the MainActor because nothing suspends between the in-flight check and the
+    // task assignment below.)
+    private func ensureFreshToken() async -> TokenRefreshOutcome {
+        guard config.mode == .personal else { return .ok }
+        if let inFlight = tokenRefreshTask { return await inFlight.value }
         let now = Date().timeIntervalSince1970
         let valid = !(config.accessToken ?? "").isEmpty && (config.accessTokenExpiry ?? 0) - now > 300
-        if valid { return true }
+        if valid { return .ok }
         guard let refreshToken = config.refreshToken, !refreshToken.isEmpty,
-              let clientId = config.oauthClientId, !clientId.isEmpty else { return false }
-        do {
-            let tokens = try await makeOAuthClient().refresh(refreshToken: refreshToken, clientId: clientId)
-            config.accessToken = tokens.accessToken
-            config.refreshToken = tokens.refreshToken     // rotated — must persist the new one
-            config.accessTokenExpiry = tokens.expiry.timeIntervalSince1970
-            try config.save()
+              let clientId = config.oauthClientId, !clientId.isEmpty else { return .signedOut }
+        let oauth = makeOAuthClient()
+        let generation = oauthSessionGeneration
+        let task = Task { () -> TokenRefreshOutcome in
+            do {
+                let tokens = try await oauth.refresh(refreshToken: refreshToken, clientId: clientId)
+                guard generation == oauthSessionGeneration else { return .superseded }
+                config.accessToken = tokens.accessToken
+                config.refreshToken = tokens.refreshToken     // rotated — must persist the new one
+                config.accessTokenExpiry = tokens.expiry.timeIntervalSince1970
+                try config.save()
+                return .ok
+            } catch {
+                guard generation == oauthSessionGeneration else { return .superseded }
+                // Only the token endpoint's structured verdict on the grant signs the
+                // user out — a proxy's 400 or a failing discovery fetch must not.
+                if let oauthError = error as? OAuthClient.OAuthError, oauthError.indicatesDeadGrant {
+                    return .signedOut
+                }
+                return .transient(error.localizedDescription)
+            }
+        }
+        tokenRefreshTask = task
+        let outcome = await task.value
+        tokenRefreshTask = nil
+        return outcome
+    }
+
+    // Personal mode: freshen the bearer before a user-triggered API call. Returns false
+    // when the call should be abandoned (error surfaced or re-sign-in required).
+    private func readyForPersonalCall() async -> Bool {
+        switch await ensureFreshToken() {
+        case .ok:
             return true
-        } catch {
+        case .transient(let message):
+            errorMessage = "Couldn't reach SnapTrade — \(message)"
             return false
+        case .signedOut:
+            // Drop the dead tokens: UI gating keys off hasOAuthSession (onboarding's
+            // Connect button would otherwise stay enabled but do nothing), and set
+            // errorMessage too — onboarding renders that, not the phase.
+            oauthSessionGeneration += 1
+            config.clearOAuthSession()
+            try? config.save()
+            errorMessage = "Session expired — sign in with SnapTrade again."
+            phase = .needsConfig("Session expired — sign in with SnapTrade again.")
+            return false
+        case .superseded:
+            // The session was deliberately replaced or ended while the refresh was in
+            // flight — whatever state exists now governs; just abandon this call.
+            return false
+        }
+    }
+
+    // Best-effort server-side revocation, detached so callers stay instant and an
+    // offline sign-out still succeeds. Refresh token first: revoking it invalidates the
+    // whole grant; the access token is revoked too for the remainder of its lifetime.
+    // Call BEFORE clearOAuthSession — that deletes the only local copies.
+    private func revokePersonalSessionServerSide() {
+        guard let clientId = config.oauthClientId, !clientId.isEmpty else { return }
+        let oauth = makeOAuthClient()
+        let refreshToken = config.refreshToken
+        let accessToken = config.accessToken
+        Task {
+            if let rt = refreshToken, !rt.isEmpty { await oauth.revoke(token: rt, clientId: clientId) }
+            if let at = accessToken, !at.isEmpty { await oauth.revoke(token: at, clientId: clientId) }
         }
     }
 
     func signOutPersonal() {
         cancelConnectWatch()
+        revokePersonalSessionServerSide()
+        // Fence out any refresh already in flight — its rotated tokens must not be
+        // re-persisted after the wipe below, silently undoing the sign-out.
+        oauthSessionGeneration += 1
         config.clearOAuthSession()
         try? config.save()
         groups = []
@@ -665,6 +801,7 @@ final class AppState: ObservableObject {
 
     // Opens the SnapTrade connection portal in the browser to link a brokerage.
     func connectAccount() async {
+        guard await readyForPersonalCall() else { return }
         do {
             let before = await currentAuthorizations()
             let url = try await client.connectURL(userId: config.userId, userSecret: config.userSecret)
@@ -766,13 +903,13 @@ final class AppState: ObservableObject {
 
     func refresh(fullDetails: Bool = true) async {
         guard case .ready = phase, !isRefreshing else { return }
-        // Personal OAuth: make sure the bearer token is fresh before any data calls.
-        if config.mode == .personal, !(await ensureFreshTokenIfNeeded()) {
-            phase = .needsConfig("Session expired — sign in with SnapTrade again.")
-            return
-        }
+        // Set BEFORE the token refresh below — it also gates re-entry, and the token
+        // round-trip is a suspension point another refresh() call could slip through.
         isRefreshing = true
         defer { isRefreshing = false }
+        // Personal OAuth: make sure the bearer token is fresh before any data calls.
+        // A transient failure keeps the last data on screen with an error banner.
+        guard await readyForPersonalCall() else { return }
         do {
             async let accountsCall = client.listAccounts(userId: config.userId, userSecret: config.userSecret)
             async let authsCall = client.listAuthorizations(userId: config.userId, userSecret: config.userSecret)
@@ -937,6 +1074,7 @@ final class AppState: ObservableObject {
     }
 
     func removeConnection(id: String) async {
+        guard await readyForPersonalCall() else { return }
         do {
             try await client.deleteAuthorization(id: id, userId: config.userId, userSecret: config.userSecret)
             errorMessage = nil
@@ -1045,6 +1183,7 @@ final class AppState: ObservableObject {
     // Takes a bare id so a notification action — which only carries the id in userInfo,
     // not the whole authorization — can drive the same flow as the in-app button.
     func reconnectAuthorization(id: String) async {
+        guard await readyForPersonalCall() else { return }
         do {
             let before = await currentAuthorizations()
             let url = try await client.connectURL(

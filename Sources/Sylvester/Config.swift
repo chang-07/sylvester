@@ -18,8 +18,9 @@ struct SylvesterConfig: Codable {
     // Used as fallback when the live FX fetch fails.
     var fxRates: [String: Double]?
 
-    // Personal-key OAuth state. Absent on classic partner-key configs (nil => partner).
-    var authMode: String? = nil          // "partner" (default) | "personal"
+    // Personal-key OAuth state. nil means the mode is inferred: partner-shaped configs
+    // (any partner creds present) predate this field, everything else is OAuth-first.
+    var authMode: String? = nil          // "partner" | "personal" | nil (inferred)
     var oauthClientId: String? = nil     // DCR-registered public client id (non-secret)
     var accessToken: String? = nil       // bearer token — Keychain only, never on disk
     var refreshToken: String? = nil      // rotates each refresh — Keychain only
@@ -46,7 +47,18 @@ struct SylvesterConfig: Codable {
     var hasPartnerCreds: Bool { !clientId.isEmpty && !consumerKey.isEmpty }
     var hasUser: Bool { !userId.isEmpty && !userSecret.isEmpty }
 
-    var mode: AuthMode { AuthMode(rawValue: authMode ?? "") ?? .partner }
+    var mode: AuthMode {
+        if let explicit = AuthMode(rawValue: authMode ?? "") { return explicit }
+        // Legacy configs predate authMode and never had it written: any partner-shaped
+        // residue means partner. Checked against the file-resident identity fields
+        // (clientId/userId) and not just the hydrated secrets, because Keychain
+        // hydration can fail (denied prompt, locked keychain) and a partner install
+        // must never present as a fresh OAuth-first one — following the sign-in it
+        // offers would wipe the partner setup. A blank config is a fresh install.
+        let partnerShaped = !clientId.isEmpty || !userId.isEmpty
+            || !consumerKey.isEmpty || !userSecret.isEmpty
+        return partnerShaped ? .partner : .personal
+    }
     // Personal OAuth is "signed in" once we hold a refresh token (access tokens are
     // short-lived and re-minted from it); the access token alone suffices right after login.
     var hasOAuthSession: Bool { !(refreshToken ?? "").isEmpty || !(accessToken ?? "").isEmpty }

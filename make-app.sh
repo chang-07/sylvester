@@ -25,6 +25,16 @@ sign_identity() {
     fi
 }
 
+# Version is single-sourced from the VERSION file. CFBundleVersion must be monotonic,
+# so derive it from the version (0.3.0 -> 300) — identical for git checkouts, tarballs,
+# and shallow clones alike, unlike a commit count.
+VERSION=$(tr -d '[:space:]' < VERSION)
+# awk arithmetic silently coerces garbage to 0, so validate the shape (and the <100
+# component bound the formula's monotonicity depends on) before deriving anything.
+[[ "$VERSION" =~ ^[0-9]+\.[0-9]{1,2}\.[0-9]{1,2}$ ]] \
+    || { echo "bad VERSION: '$VERSION' (want MAJOR.MINOR.PATCH, minor/patch < 100)" >&2; exit 1; }
+BUILD=$(awk -F. '{ print $1 * 10000 + $2 * 100 + $3 }' <<< "$VERSION")
+
 # SYLVESTER_BUILD_FLAGS lets release.sh request a universal build (--arch arm64 --arch x86_64);
 # --show-bin-path then resolves the right products dir for either host or universal builds.
 BUILD_FLAGS="${SYLVESTER_BUILD_FLAGS:-}"
@@ -39,7 +49,7 @@ cp "$BIN_DIR/Sylvester" "$APP/Contents/MacOS/Sylvester"
 mkdir -p "$APP/Contents/Resources"
 cp icon/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
-cat > "$APP/Contents/Info.plist" <<'PLIST'
+cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -50,8 +60,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
     <key>CFBundleExecutable</key><string>Sylvester</string>
     <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>CFBundlePackageType</key><string>APPL</string>
-    <key>CFBundleShortVersionString</key><string>0.2.0</string>
-    <key>CFBundleVersion</key><string>6</string>
+    <key>CFBundleShortVersionString</key><string>$VERSION</string>
+    <key>CFBundleVersion</key><string>$BUILD</string>
     <key>LSMinimumSystemVersion</key><string>14.0</string>
     <key>LSUIElement</key><true/>
     <key>NSHighResolutionCapable</key><true/>

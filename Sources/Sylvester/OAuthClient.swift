@@ -5,7 +5,8 @@ import Network
 import Security
 
 // Personal-key OAuth2 (django-oauth-toolkit / "DOT") authorization-code flow with PKCE,
-// as a public native client. Registers itself once via dynamic client registration, opens
+// as a public native client. Identifies as the pre-registered release client when one is
+// shipped (releaseClientId), falling back to one-time dynamic client registration; opens
 // the dashboard consent page in the browser, captures the redirect on a 127.0.0.1 loopback,
 // and exchanges the code for access + refresh tokens.
 //
@@ -15,6 +16,11 @@ import Security
 // and discovery keeps us correct across environments.
 struct OAuthClient {
     var apiBase = URL(string: "https://api.snaptrade.com")!
+
+    // The pre-registered public client id shipped with release builds. Applies to prod
+    // only — an apiBaseURL override (staging) still registers its own client. While this
+    // is empty, every install falls back to one-time dynamic client registration.
+    static let releaseClientId = ""
 
     // The server requires an EXACT redirect_uri match incl. port (no ephemeral ports), so we
     // register a few fixed loopback ports and bind whichever is free at sign-in time.
@@ -29,6 +35,7 @@ struct OAuthClient {
         let authorize: URL   // interactive consent (browser) — typically the dashboard host
         let token: URL
         let register: URL
+        let revoke: URL?     // RFC 7009 — optional in the discovery document
     }
 
     struct Tokens {
@@ -39,7 +46,31 @@ struct OAuthClient {
 
     enum OAuthError: LocalizedError {
         case message(String)
-        var errorDescription: String? { if case .message(let m) = self { return m } else { return nil } }
+        // code is the structured OAuth error ("invalid_grant", …) when the server sent
+        // one — classification must use it, not the human-readable detail, because
+        // servers are free to reword error_description at any time.
+        case http(status: Int, code: String?, detail: String)
+        var errorDescription: String? {
+            switch self {
+            case .message(let m): return m
+            case .http(let status, _, let detail): return "OAuth \(status): \(detail)"
+            }
+        }
+        private func matches(_ codes: Set<String>) -> Bool {
+            switch self {
+            case .http(_, let code, let detail):
+                if let code { return codes.contains(code) }
+                return codes.contains(where: detail.lowercased().contains)
+            case .message(let m):
+                return codes.contains(where: m.lowercased().contains)
+            }
+        }
+        // The registered client was purged/expired server-side — recoverable by
+        // re-running dynamic client registration.
+        var isInvalidClient: Bool { matches(["invalid_client"]) }
+        // The grant itself is dead (revoked/expired refresh token, dead client) —
+        // as opposed to the server or network merely misbehaving.
+        var indicatesDeadGrant: Bool { matches(["invalid_grant", "invalid_client"]) }
     }
 
     // MARK: - Discovery
@@ -51,13 +82,15 @@ struct OAuthClient {
             let authorization_endpoint: String
             let token_endpoint: String
             let registration_endpoint: String
+            let revocation_endpoint: String?
         }
         let d = try JSONDecoder().decode(Doc.self, from: data)
         guard let a = URL(string: d.authorization_endpoint),
               let t = URL(string: d.token_endpoint),
               let r = URL(string: d.registration_endpoint)
         else { throw OAuthError.message("malformed OAuth discovery document") }
-        return Metadata(authorize: a, token: t, register: r)
+        return Metadata(authorize: a, token: t, register: r,
+                        revoke: d.revocation_endpoint.flatMap(URL.init(string:)))
     }
 
     // MARK: - Dynamic client registration (once; persist the returned client_id)
@@ -83,6 +116,43 @@ struct OAuthClient {
             enum CodingKeys: String, CodingKey { case clientId = "client_id" }
         }
         return try JSONDecoder().decode(RegisterResponse.self, from: data).clientId
+    }
+
+    // MARK: - Client-id preflight
+
+    // A purged/unknown client id fails at the authorization endpoint INSIDE THE BROWSER —
+    // per RFC 6749 the server must not redirect for a client it can't verify, so the
+    // loopback never fires and all the app would see is a 5-minute timeout. Probe the
+    // authorize URL directly first. Only a positive "this client is unknown" verdict is
+    // returned as true; anything ambiguous (offline, a login page, an error that
+    // redirected to the loopback) proceeds with the id as-is.
+    func clientLooksInvalid(clientId: String) async -> Bool {
+        guard let meta = try? await discover(),
+              var comps = URLComponents(url: meta.authorize, resolvingAgainstBaseURL: false)
+        else { return false }
+        comps.queryItems = [
+            .init(name: "response_type", value: "code"),
+            .init(name: "client_id", value: clientId),
+            .init(name: "redirect_uri", value: Self.redirectURI(port: Self.redirectPorts[0])),
+            .init(name: "scope", value: "read"),
+            .init(name: "state", value: Self.randomURLSafe(bytes: 8)),
+            .init(name: "code_challenge", value: Self.codeChallenge(for: Self.randomURLSafe(bytes: 32))),
+            .init(name: "code_challenge_method", value: "S256"),
+        ]
+        guard let url = comps.url else { return false }
+        // A fast fail-open check must not stall the sign-in button behind default
+        // 60s timeouts, and redirects are never followed: any redirect means the
+        // client + redirect_uri were accepted (a login page or an error handed back
+        // to the app), and following one could hand the verdict to whatever foreign
+        // process happens to hold the loopback port.
+        var req = URLRequest(url: url)
+        req.timeoutInterval = 8
+        guard let (data, resp) = try? await URLSession.shared.data(for: req, delegate: RedirectBlocker())
+        else { return false }
+        let status = (resp as? HTTPURLResponse)?.statusCode ?? 0
+        if (300..<400).contains(status) { return false }
+        let body = String(data: data.prefix(4096), encoding: .utf8)?.lowercased() ?? ""
+        return status == 400 || body.contains("invalid_client") || body.contains("unauthorized_client")
     }
 
     // MARK: - Interactive authorization
@@ -139,6 +209,19 @@ struct OAuthClient {
         ])
     }
 
+    // MARK: - Revocation (best-effort — never blocks a local sign-out)
+
+    // RFC 7009. The endpoint is optional in discovery; failures are swallowed because the
+    // local sign-out must succeed even when the server is unreachable.
+    func revoke(token: String, clientId: String) async {
+        guard let meta = try? await discover(), let revoke = meta.revoke else { return }
+        var req = URLRequest(url: revoke)
+        req.httpMethod = "POST"
+        req.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        req.httpBody = Data(Self.formEncode(["token": token, "client_id": clientId]).utf8)
+        _ = try? await URLSession.shared.data(for: req)
+    }
+
     private func tokenRequest(endpoint: URL, form: [String: String]) async throws -> Tokens {
         var req = URLRequest(url: endpoint)
         req.httpMethod = "POST"
@@ -161,7 +244,9 @@ struct OAuthClient {
             accessToken: t.accessToken,
             // Refresh-grant rotates; fall back to the sent token only if the server omits it.
             refreshToken: t.refreshToken ?? form["refresh_token"] ?? "",
-            expiry: Date().addingTimeInterval(TimeInterval(t.expiresIn ?? 36_000))
+            // When the server omits expires_in, assume a short lifetime — refreshing
+            // early is harmless, trusting a token for 10h isn't.
+            expiry: Date().addingTimeInterval(TimeInterval(t.expiresIn ?? 3_600))
         )
     }
 
@@ -171,18 +256,20 @@ struct OAuthClient {
         let status = (resp as? HTTPURLResponse)?.statusCode ?? 0
         guard (200..<300).contains(status) else {
             let body = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+            let code = body?["error"] as? String
             let detail = (body?["error_description"] as? String)
                 ?? (body?["detail"] as? String)
-                ?? (body?["error"] as? String)
+                ?? code
                 ?? String(data: data.prefix(300), encoding: .utf8)
                 ?? "unknown error"
-            var msg = "OAuth \(status): \(detail)"
-            // The whole flow is gated on a per-user Unleash flag; surface that on the common failures.
+            var detailOut = detail
+            // Personal sign-in can be disabled account-by-account on the server; say so
+            // without leaking internal flag names into user-facing copy.
             let lower = detail.lowercased()
             if status == 404 || status == 403 || lower.contains("not enabled") || lower.contains("access_denied") || lower.contains("personal_oauth") {
-                msg += " — confirm the enable-personal-oauth flag is on for your SnapTrade dashboard user."
+                detailOut += " — personal sign-in may not be enabled for this SnapTrade account yet."
             }
-            throw OAuthError.message(msg)
+            throw OAuthError.http(status: status, code: code, detail: detailOut)
         }
     }
 
@@ -211,6 +298,15 @@ struct OAuthClient {
             .replacingOccurrences(of: "/", with: "_")
             .replacingOccurrences(of: "=", with: "")
     }
+}
+
+// Declines every redirect so the probe in clientLooksInvalid judges only the
+// authorization server's own first response.
+private final class RedirectBlocker: NSObject, URLSessionTaskDelegate {
+    func urlSession(
+        _ session: URLSession, task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest
+    ) async -> URLRequest? { nil }
 }
 
 // One-shot loopback HTTP server that captures a single OAuth redirect on 127.0.0.1.

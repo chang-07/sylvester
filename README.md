@@ -5,7 +5,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/macOS-14%2B-111?logo=apple&logoColor=white" alt="macOS 14+">
   <img src="https://img.shields.io/badge/Swift-5.10-F05138?logo=swift&logoColor=white" alt="Swift 5.10">
-  <img src="https://img.shields.io/badge/release-v0.2.0-2E9E93" alt="v0.2.0">
+  <img src="https://img.shields.io/badge/release-v0.3.0-2E9E93" alt="v0.3.0">
   <img src="https://img.shields.io/badge/data-read--only-999" alt="read-only">
 </p>
 
@@ -48,7 +48,7 @@ Non-secret settings live at `~/.config/sylvester/config.json` (chmod 600):
 
 ## Notes
 
-- **Read-only.** Personal sign-in uses SnapTrade's OAuth2 bearer flow (PKCE, `read` scope); partner keys use canonical-JSON HMAC-SHA256 signing. Neither can trade or move money.
+- **Read-only.** Personal sign-in uses SnapTrade's OAuth2 bearer flow (PKCE, `read` scope); partner keys use canonical-JSON HMAC-SHA256 signing. Neither can trade or move money. Signing out clears the Keychain and asks SnapTrade to revoke the tokens.
 - Balances come from SnapTrade's cached reads (no forced broker refreshes), so data moves at broker sync cadence — roughly daily. Rows flag anything staler than 36h.
 - Notifications require the `.app` bundle (a bare `swift run` can't post them).
 - **Launch at login** lives in the ⋯ menu. macOS may ask you to approve Sylvester under **Login Items** in System Settings before it takes effect.

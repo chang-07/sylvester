@@ -109,7 +109,7 @@ struct OnboardingView: View {
         VStack(alignment: .leading, spacing: 11) {
             stepTitle(
                 "Connect your SnapTrade account",
-                "Sylvester uses a personal key: your browser opens, you approve read access, and the token comes straight back here. Nothing to copy or paste."
+                "Your browser opens, you approve read-only access, and the token comes straight back here. Nothing to copy or paste."
             )
 
             Button {
@@ -313,7 +313,11 @@ struct OnboardingView: View {
             .buttonStyle(.borderedProminent)
             .tint(.accentColor)
             .controlSize(.large)
-            .disabled(!state.config.hasUser && state.config.mode != .personal)
+            // Needs a live session for its mode — a signed-out OAuth user would only
+            // get an opaque 401 from the portal call.
+            .disabled(state.config.mode == .personal
+                ? !state.config.hasOAuthSession
+                : !state.config.hasUser)
 
             if state.awaitingConnection {
                 HStack(alignment: .top, spacing: 7) {
