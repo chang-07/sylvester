@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "sylvester",
+  "compatibility_date": "2026-09-11",
+  "observability": {
+    "enabled": true
+  },
+  "assets": {
+    "directory": "docs"
+  },
+  // Custom domains: Cloudflare auto-creates the DNS records and certificates for
+  // zones in this account on deploy — no manual DNS management.
+  "routes": [
+    { "pattern": "trysylvester.org", "custom_domain": true },
+    { "pattern": "www.trysylvester.org", "custom_domain": true }
+  ]
+}
