@@ -81,6 +81,15 @@ struct SylvesterConfig: Codable {
         // OAuth tokens live only in the Keychain.
         if (cfg.accessToken ?? "").isEmpty { cfg.accessToken = KeychainStore.get("accessToken") }
         if (cfg.refreshToken ?? "").isEmpty { cfg.refreshToken = KeychainStore.get("refreshToken") }
+        // An override that just restates the prod default is a no-op for data calls but
+        // would silently disable the shipped release client (that gate keys on "no
+        // override"), landing sign-in on the MCP-fenced DCR path — normalize it away.
+        if let api = cfg.apiBaseURL?.trimmingCharacters(in: .whitespacesAndNewlines) {
+            var normalized = api
+            while normalized.hasSuffix("/") { normalized.removeLast() }
+            cfg.apiBaseURL = (normalized.isEmpty || normalized.lowercased() == "https://api.snaptrade.com")
+                ? nil : normalized
+        }
         return cfg
     }
 

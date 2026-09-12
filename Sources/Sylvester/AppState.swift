@@ -140,12 +140,12 @@ final class AppState: ObservableObject {
         return c
     }
 
-    // Release builds ship a dashboard-issued confidential client plus its token broker;
-    // both are prod-only, so any apiBaseURL override (staging) keeps the DCR path.
+    // Release builds ship a pre-registered client id (public today; a confidential
+    // swap would set releaseTokenBrokerURL too). Prod-only — an apiBaseURL override
+    // (staging) keeps the DCR path. Config.load() normalizes a redundant prod-default
+    // override to nil so it can't silently disable this.
     private var usingReleaseClient: Bool {
-        config.apiBaseURL == nil
-            && !OAuthClient.releaseClientId.isEmpty
-            && !OAuthClient.releaseTokenBrokerURL.isEmpty
+        config.apiBaseURL == nil && !OAuthClient.releaseClientId.isEmpty
     }
 
     // OAuthClient with any host overrides from config applied (defaults to prod).
@@ -604,8 +604,8 @@ final class AppState: ObservableObject {
             let tokens: OAuthClient.Tokens
             let clientId: String
             if usingReleaseClient {
-                // The shipped dashboard client. No DCR and no self-heal re-registration
-                // here — a broken release client can only be fixed server-side. The
+                // The shipped client. No DCR and no self-heal re-registration here —
+                // a broken release client can only be fixed server-side. The
                 // preflight still matters: an unknown client id dies INSIDE the browser
                 // (no redirect back), which would otherwise read as a silent 5-minute
                 // "waiting for sign-in" hang instead of an error.

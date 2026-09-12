@@ -17,22 +17,23 @@ import Security
 struct OAuthClient {
     var apiBase = URL(string: "https://api.snaptrade.com")!
 
-    // The dashboard-issued OAuth app shipped with release builds. SnapTrade issues
-    // CONFIDENTIAL clients only, so the token exchange needs the client secret — which
-    // a distributed app can't hold. releaseTokenBrokerURL is the minimal Sylvester
-    // service (broker/ in this repo) that attaches the secret to /token and /revoke;
-    // everything else (authorize, PKCE, data calls) stays direct. Both constants apply
-    // to prod only — an apiBaseURL override (staging) keeps the DCR public-client path,
-    // as do source builds while these are empty.
-    static let releaseClientId = ""
-    static let releaseTokenBrokerURL = ""   // e.g. https://sylvester-broker.fly.dev
+    // The client shipped with release builds: Sylvester's original DCR-registered
+    // PUBLIC client. It predates the backend's MCP-only marker, so its tokens keep
+    // direct API access (unlike anything freshly self-registered — that path is fenced
+    // in prod now); claiming + renaming it server-side is pending, à la SnapTrade
+    // MenuBar. Public client ⇒ the token exchange needs only PKCE — no secret, and no
+    // server-side piece. Prod only — an apiBaseURL override (staging) keeps DCR.
+    static let releaseClientId = "HQBpUsh98o7D_EOzBFWQ_sQ4QluQdDUr"
+    // Set ONLY if the release client is ever swapped for a confidential (dashboard-
+    // issued) one: routes token grants and revocation through broker/ (which holds the
+    // client secret). Empty = public client, direct exchange.
+    static let releaseTokenBrokerURL = ""
 
-    // The broker serves ONLY the release client, so routing follows the client a token
-    // belongs to — never build configuration alone. A DCR-era session must keep
-    // refreshing (and revoking) against the public endpoints it was minted on even in
-    // a release build, and a release-client session stays on the broker even if
-    // apiBaseURL gets overridden later; routing by constants instead would silently
-    // misdirect both, killing valid sessions and no-op'ing their revocations.
+    // Routes a token operation through broker/ ONLY in the confidential-swap
+    // configuration (releaseTokenBrokerURL set) AND when the token belongs to the
+    // release client — a DCR-era session must keep using the public endpoints it was
+    // minted on. With a public release client (broker URL empty, the shipped setup)
+    // this always returns nil and every token operation goes direct.
     private static func brokerEndpoint(_ path: String, for clientId: String) -> URL? {
         guard !releaseClientId.isEmpty, clientId == releaseClientId,
               let base = URL(string: releaseTokenBrokerURL) else { return nil }
