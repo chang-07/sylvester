@@ -17,10 +17,27 @@ import Security
 struct OAuthClient {
     var apiBase = URL(string: "https://api.snaptrade.com")!
 
-    // The pre-registered public client id shipped with release builds. Applies to prod
-    // only — an apiBaseURL override (staging) still registers its own client. While this
-    // is empty, every install falls back to one-time dynamic client registration.
+    // The dashboard-issued OAuth app shipped with release builds. SnapTrade issues
+    // CONFIDENTIAL clients only, so the token exchange needs the client secret — which
+    // a distributed app can't hold. releaseTokenBrokerURL is the minimal Sylvester
+    // service (broker/ in this repo) that attaches the secret to /token and /revoke;
+    // everything else (authorize, PKCE, data calls) stays direct. Both constants apply
+    // to prod only — an apiBaseURL override (staging) keeps the DCR public-client path,
+    // as do source builds while these are empty.
     static let releaseClientId = ""
+    static let releaseTokenBrokerURL = ""   // e.g. https://sylvester-broker.fly.dev
+
+    // The broker serves ONLY the release client, so routing follows the client a token
+    // belongs to — never build configuration alone. A DCR-era session must keep
+    // refreshing (and revoking) against the public endpoints it was minted on even in
+    // a release build, and a release-client session stays on the broker even if
+    // apiBaseURL gets overridden later; routing by constants instead would silently
+    // misdirect both, killing valid sessions and no-op'ing their revocations.
+    private static func brokerEndpoint(_ path: String, for clientId: String) -> URL? {
+        guard !releaseClientId.isEmpty, clientId == releaseClientId,
+              let base = URL(string: releaseTokenBrokerURL) else { return nil }
+        return base.appendingPathComponent(path)
+    }
 
     // The server requires an EXACT redirect_uri match incl. port (no ephemeral ports), so we
     // register a few fixed loopback ports and bind whichever is free at sign-in time.
@@ -189,7 +206,7 @@ struct OAuthClient {
         guard let code = query["code"], !code.isEmpty else { throw OAuthError.message("no authorization code was returned") }
 
         // The authorization code expires in ~60s, so exchange immediately.
-        return try await tokenRequest(endpoint: meta.token, form: [
+        return try await tokenRequest(endpoint: Self.brokerEndpoint("token", for: clientId) ?? meta.token, form: [
             "grant_type": "authorization_code",
             "code": code,
             "redirect_uri": redirectURI,
@@ -201,8 +218,14 @@ struct OAuthClient {
     // MARK: - Refresh (refresh token ROTATES — always persist the returned one)
 
     func refresh(refreshToken: String, clientId: String) async throws -> Tokens {
-        let meta = try await discover()
-        return try await tokenRequest(endpoint: meta.token, form: [
+        // The broker path needs no discovery round-trip for a refresh.
+        let endpoint: URL
+        if let broker = Self.brokerEndpoint("token", for: clientId) {
+            endpoint = broker
+        } else {
+            endpoint = try await discover().token
+        }
+        return try await tokenRequest(endpoint: endpoint, form: [
             "grant_type": "refresh_token",
             "refresh_token": refreshToken,
             "client_id": clientId,
@@ -212,9 +235,17 @@ struct OAuthClient {
     // MARK: - Revocation (best-effort — never blocks a local sign-out)
 
     // RFC 7009. The endpoint is optional in discovery; failures are swallowed because the
-    // local sign-out must succeed even when the server is unreachable.
+    // local sign-out must succeed even when the server is unreachable. Confidential
+    // clients must revoke through the broker — the raw endpoint demands the secret.
     func revoke(token: String, clientId: String) async {
-        guard let meta = try? await discover(), let revoke = meta.revoke else { return }
+        let revoke: URL
+        if let broker = Self.brokerEndpoint("revoke", for: clientId) {
+            revoke = broker
+        } else if let meta = try? await discover(), let discovered = meta.revoke {
+            revoke = discovered
+        } else {
+            return
+        }
         var req = URLRequest(url: revoke)
         req.httpMethod = "POST"
         req.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")

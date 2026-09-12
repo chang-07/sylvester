@@ -49,7 +49,7 @@ struct MenuView: View {
         VStack(alignment: .leading, spacing: 12) {
             Label("Set up Sylvester", systemImage: "gearshape")
                 .font(.headline)
-            Text("Connect your SnapTrade account. Everything stays on this Mac — tokens in the Keychain, data pulled straight from the SnapTrade API.")
+            Text("Connect your SnapTrade account. Tokens stay in your Keychain and account data comes straight from the SnapTrade API.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

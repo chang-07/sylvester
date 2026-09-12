@@ -9,7 +9,7 @@
   <img src="https://img.shields.io/badge/data-read--only-999" alt="read-only">
 </p>
 
-**Sylvester** is a macOS menubar app showing your net worth and per-account breakdown across every brokerage you've linked in [SnapTrade](https://snaptrade.com) — holdings, allocation, a net-worth trend, and an activity feed with native notifications for new dividends, trades, and deposits. It's a pure local client: tokens live in the macOS Keychain and data is pulled straight from the SnapTrade API.
+**Sylvester** is a macOS menubar app showing your net worth and per-account breakdown across every brokerage you've linked in [SnapTrade](https://snaptrade.com) — holdings, allocation, a net-worth trend, and an activity feed with native notifications for new dividends, trades, and deposits. It's a local-first client: tokens live in the macOS Keychain and account data is pulled straight from the SnapTrade API. The only server-side piece is a tiny stateless [token broker](broker/) that completes the OAuth sign-in (SnapTrade issues confidential OAuth clients, so the exchange needs a secret the app can't ship) — it stores nothing and never sees your account data.
 
 ## Install
 
@@ -49,6 +49,7 @@ Non-secret settings live at `~/.config/sylvester/config.json` (chmod 600):
 ## Notes
 
 - **Read-only.** Personal sign-in uses SnapTrade's OAuth2 bearer flow (PKCE, `read` scope); partner keys use canonical-JSON HMAC-SHA256 signing. Neither can trade or move money. Signing out clears the Keychain and asks SnapTrade to revoke the tokens.
+- **Token broker.** Release builds complete the OAuth code/refresh exchange via `broker/` (a ~100-line stateless proxy holding the app's client secret); all account data flows directly between your Mac and SnapTrade. Deploy your own with `fly launch` in `broker/` if you build from source with your own OAuth app.
 - Balances come from SnapTrade's cached reads (no forced broker refreshes), so data moves at broker sync cadence — roughly daily. Rows flag anything staler than 36h.
 - Notifications require the `.app` bundle (a bare `swift run` can't post them).
 - **Launch at login** lives in the ⋯ menu. macOS may ask you to approve Sylvester under **Login Items** in System Settings before it takes effect.

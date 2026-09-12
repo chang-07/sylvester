@@ -140,10 +140,20 @@ final class AppState: ObservableObject {
         return c
     }
 
+    // Release builds ship a dashboard-issued confidential client plus its token broker;
+    // both are prod-only, so any apiBaseURL override (staging) keeps the DCR path.
+    private var usingReleaseClient: Bool {
+        config.apiBaseURL == nil
+            && !OAuthClient.releaseClientId.isEmpty
+            && !OAuthClient.releaseTokenBrokerURL.isEmpty
+    }
+
     // OAuthClient with any host overrides from config applied (defaults to prod).
     private func makeOAuthClient() -> OAuthClient {
         var oauth = OAuthClient()
-        // apiBase drives discovery, which in turn yields the authorize/token/register URLs.
+        // apiBase drives discovery, which in turn yields the authorize/token/register
+        // URLs. Broker routing needs no wiring here — OAuthClient decides per token's
+        // client id, so DCR-era and release-client sessions each stay on their own path.
         if let api = config.apiBaseURL, let url = URL(string: api) { oauth.apiBase = url }
         return oauth
     }
@@ -591,41 +601,22 @@ final class AppState: ObservableObject {
         defer { setupBusy = false }
         let oauth = makeOAuthClient()
         do {
-            var freshlyRegistered = false
-            var clientId: String
-            if let existing = config.oauthClientId, !existing.isEmpty {
-                clientId = existing
-            } else if config.apiBaseURL == nil, !OAuthClient.releaseClientId.isEmpty {
-                // The pre-registered client only exists on prod; overridden hosts
-                // (staging) still get their own registration below.
-                clientId = OAuthClient.releaseClientId
-            } else {
-                clientId = try await oauth.registerClient(clientName: "Sylvester")
-                // Remembered AND persisted immediately, so an abandoned browser tab —
-                // or a quit-and-relaunch — doesn't register another client every retry.
-                config.oauthClientId = clientId
-                try? config.save()
-                freshlyRegistered = true
-            }
-            // A purged remembered id fails inside the browser (no redirect back), which
-            // the app can't observe — so probe first and re-register instead of hanging.
-            // Never while a session is live: refresh still working proves the id, and a
-            // probe false-positive must not swap the client id out from under it.
-            if !freshlyRegistered, !config.hasOAuthSession, await oauth.clientLooksInvalid(clientId: clientId) {
-                clientId = try await oauth.registerClient(clientName: "Sylvester")
-                config.oauthClientId = clientId
-                try? config.save()
-                freshlyRegistered = true
-            }
             let tokens: OAuthClient.Tokens
-            do {
+            let clientId: String
+            if usingReleaseClient {
+                // The shipped dashboard client. No DCR and no self-heal re-registration
+                // here — a broken release client can only be fixed server-side. The
+                // preflight still matters: an unknown client id dies INSIDE the browser
+                // (no redirect back), which would otherwise read as a silent 5-minute
+                // "waiting for sign-in" hang instead of an error.
+                clientId = OAuthClient.releaseClientId
+                if await oauth.clientLooksInvalid(clientId: clientId) {
+                    throw OAuthClient.OAuthError.message(
+                        "SnapTrade rejected Sylvester's sign-in client — check for an app update, then try again.")
+                }
                 tokens = try await oauth.authorize(clientId: clientId)
-            } catch let error as OAuthClient.OAuthError where error.isInvalidClient && !freshlyRegistered {
-                // Backstop for a registration purged mid-flow (surfaces at token exchange).
-                clientId = try await oauth.registerClient(clientName: "Sylvester")
-                config.oauthClientId = clientId
-                try? config.save()
-                tokens = try await oauth.authorize(clientId: clientId)
+            } else {
+                (clientId, tokens) = try await signInViaDCR(oauth: oauth)
             }
             // The old session (if any) ends here — fence out any refresh in flight so a
             // stale verdict can't tear down or overwrite the tokens stored below.
@@ -656,6 +647,42 @@ final class AppState: ObservableObject {
             await refresh()
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    // Dynamic-client-registration sign-in for staging/source builds (no shipped client).
+    // Registers a public client once, self-heals a server-side purge of the stored id.
+    private func signInViaDCR(oauth: OAuthClient) async throws -> (String, OAuthClient.Tokens) {
+        var freshlyRegistered = false
+        var clientId: String
+        if let existing = config.oauthClientId, !existing.isEmpty {
+            clientId = existing
+        } else {
+            clientId = try await oauth.registerClient(clientName: "Sylvester")
+            // Remembered AND persisted immediately, so an abandoned browser tab —
+            // or a quit-and-relaunch — doesn't register another client every retry.
+            config.oauthClientId = clientId
+            try? config.save()
+            freshlyRegistered = true
+        }
+        // A purged remembered id fails inside the browser (no redirect back), which
+        // the app can't observe — so probe first and re-register instead of hanging.
+        // Never while a session is live: refresh still working proves the id, and a
+        // probe false-positive must not swap the client id out from under it.
+        if !freshlyRegistered, !config.hasOAuthSession, await oauth.clientLooksInvalid(clientId: clientId) {
+            clientId = try await oauth.registerClient(clientName: "Sylvester")
+            config.oauthClientId = clientId
+            try? config.save()
+            freshlyRegistered = true
+        }
+        do {
+            return (clientId, try await oauth.authorize(clientId: clientId))
+        } catch let error as OAuthClient.OAuthError where error.isInvalidClient && !freshlyRegistered {
+            // Backstop for a registration purged mid-flow (surfaces at token exchange).
+            clientId = try await oauth.registerClient(clientName: "Sylvester")
+            config.oauthClientId = clientId
+            try? config.save()
+            return (clientId, try await oauth.authorize(clientId: clientId))
         }
     }
 

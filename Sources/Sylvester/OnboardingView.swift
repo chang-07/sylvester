@@ -78,10 +78,10 @@ struct OnboardingView: View {
         VStack(alignment: .leading, spacing: 11) {
             stepTitle(
                 "Your net worth, every brokerage, in the menubar.",
-                "Four quick steps. Nothing leaves this Mac."
+                "Four quick steps. Read-only, with tokens in your Keychain."
             )
             VStack(alignment: .leading, spacing: 8) {
-                bullet("lock.fill", "Tokens live in your Keychain. Balances are pulled straight from SnapTrade — there's no Sylvester server.")
+                bullet("lock.fill", "Tokens live in your Keychain and balances come straight from SnapTrade. Sylvester's only server is a tiny sign-in helper that stores nothing.")
                 bullet("eye.slash.fill", "Read-only access. Sylvester can't place trades or move money.")
                 bullet("bell.badge.fill", "macOS will ask for a couple of permissions. We'll explain each one first.")
             }

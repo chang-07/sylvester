@@ -4,10 +4,10 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Sylvester — your net worth, every brokerage, in the menubar</title>
-<meta name="description" content="Sylvester is a macOS menubar app showing your net worth and per-account breakdown across every brokerage you've linked in SnapTrade. Read-only, local-first, tokens in your Keychain, no server." />
+<meta name="description" content="Sylvester is a macOS menubar app showing your net worth and per-account breakdown across every brokerage you've linked in SnapTrade. Read-only, local-first, tokens in your Keychain." />
 <link rel="icon" type="image/svg+xml" href="assets/sylvester-logo.svg" />
 <meta property="og:title" content="Sylvester — your net worth, every brokerage, in the menubar" />
-<meta property="og:description" content="A macOS menubar app for net worth across every brokerage you've linked in SnapTrade. Read-only, local-first, no server." />
+<meta property="og:description" content="A macOS menubar app for net worth across every brokerage you've linked in SnapTrade. Read-only, local-first." />
 <meta property="og:type" content="website" />
 <style>
 :root {
@@ -237,7 +237,7 @@ footer { border-top: 1px solid var(--line); padding: 30px 0 44px; font-size: 13.
       <ul class="chips">
         <li>Read-only</li>
         <li>Tokens in your Keychain</li>
-        <li>No server, no telemetry</li>
+        <li>Local-first, no telemetry</li>
         <li>macOS 14+</li>
       </ul>
 
@@ -334,8 +334,8 @@ footer { border-top: 1px solid var(--line); padding: 30px 0 44px; font-size: 13.
     </p>
     <ul>
       <li><svg class="tick" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span><strong>Read-only by construction.</strong> Sign-in uses OAuth2 with PKCE, scoped to <code>read</code>. Placing a trade or moving money isn't something it declines to do — it's something the token can't authorize.</span></li>
-      <li><svg class="tick" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span><strong>There is no Sylvester server.</strong> Your Mac talks to SnapTrade directly. Nothing is relayed through, logged by, or stored on infrastructure belonging to this app, because none exists.</span></li>
-      <li><svg class="tick" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span><strong>Tokens live in your Keychain.</strong> Never written to disk in plaintext, never in the config file, never transmitted anywhere but SnapTrade.</span></li>
+      <li><svg class="tick" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span><strong>Your account data never touches a Sylvester server.</strong> Balances, holdings, and activity flow directly between your Mac and SnapTrade. The one server-side piece is a stateless ~100-line sign-in broker that completes the OAuth token exchange (SnapTrade requires a client secret apps can't ship) — it stores nothing, logs nothing, and its source is in the repo.</span></li>
+      <li><svg class="tick" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span><strong>Tokens live in your Keychain.</strong> Never written to disk in plaintext, never in the config file, never sent anywhere but SnapTrade and the sign-in broker.</span></li>
       <li><svg class="tick" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span><strong>No analytics of any kind.</strong> No crash reporting, no usage pings, no accounts. Net-worth history is a JSON file in <code>~/.config/sylvester</code> that only you ever read.</span></li>
       <li><svg class="tick" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span><strong>The source is right there.</strong> Every claim above is checkable in a few thousand lines of Swift rather than taken on trust.</span></li>
     </ul>
