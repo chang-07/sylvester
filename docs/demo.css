@@ -1,152 +1,176 @@
-/* Sylvester live demo widget — a faithful light-mode recreation of the app popover.
-   Colors/type mirror Sources/Sylvester/Theme.swift (light appearance). */
+/* Sylvester live demo — transcription of the app popover (LIGHT appearance).
+   Every value here mirrors the SwiftUI source: MenuView/ChartsViews/ActivityFeedView/
+   Controls/Theme. pt == px at 1x; popover frame width 340. macOS light semantics:
+   primary rgba(0,0,0,.85) · secondary rgba(0,0,0,.5) · tertiary rgba(0,0,0,.26) ·
+   quaternary rgba(0,0,0,.1) · accent #007AFF · green #28CD41 · red #FF3B30. */
 
 .demo-wrap { display: flex; flex-direction: column; align-items: center; gap: 12px; }
 
+/* menubar strip (site chrome; label composition mirrors menuBarImage) */
 .demo-menubar {
-  width: 100%; max-width: 384px;
-  display: flex; justify-content: flex-end; align-items: center; gap: 14px;
+  width: 340px; max-width: 100%;
+  display: flex; justify-content: flex-end; align-items: center;
   background: #F6F4EF; border: 1px solid var(--line); border-bottom: none;
-  border-radius: 10px 10px 0 0; padding: 6px 12px;
-  font-size: 12px; color: #1d1d1f;
+  border-radius: 10px 10px 0 0; padding: 5px 10px;
+  font-family: ui-rounded, "SF Pro Rounded", var(--sans);
+  font-variant-numeric: tabular-nums;
 }
-.demo-menubar .pill { font-weight: 600; display: flex; align-items: center; gap: 5px; }
-.demo-menubar .up { color: #219947; font-weight: 650; }
-.demo-menubar .dim { color: #6e6e73; }
+.demo-menubar .val { font-size: 13px; font-weight: 500; color: rgba(0,0,0,.88); }
+.demo-menubar .chg { font-size: 12px; font-weight: 600; color: #219947; margin-left: 4px; }
+.demo-menubar .sfx { font-size: 12px; color: rgba(0,0,0,.7); margin-left: 4px; font-family: var(--sans); }
+.demo-menubar .clock { font-size: 12px; color: rgba(0,0,0,.88); margin-left: 14px; font-family: var(--sans); }
 
+/* popover frame */
 .demo {
-  width: 100%; max-width: 384px;
-  background: #F5F5F6; color: #1d1d1f;
-  border: 1px solid rgba(0,0,0,.12); border-radius: 0 0 14px 14px;
+  width: 340px; max-width: 100%;
+  background: #F2F2F3; color: rgba(0,0,0,.85);
+  border: 1px solid rgba(0,0,0,.14); border-radius: 0 0 12px 12px;
   box-shadow: var(--shadow);
-  font-family: var(--sans); font-size: 13px; line-height: 1.35;
-  display: flex; flex-direction: column;
-  height: 566px; overflow: hidden;
-  text-align: left;
+  font-family: var(--sans); font-size: 13px; line-height: 1.3;
+  display: flex; flex-direction: column; overflow: hidden;
+  text-align: left; position: relative;
 }
 .demo * { box-sizing: border-box; }
-.demo button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+.demo button { font: inherit; color: inherit; background: none; border: none; padding: 0; cursor: pointer; text-align: left; }
+.demo button.d-chip, .demo button.d-tab, .demo button.d-btn { text-align: center; }
+.demo .mono { font-variant-numeric: tabular-nums; }
+.demo .divider { height: 1px; background: rgba(0,0,0,.1); flex-shrink: 0; }
 
-/* ── header ── */
-.d-head { padding: 13px 14px 11px; border-bottom: 1px solid rgba(0,0,0,.08); }
-.d-label { display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; color: #6e6e73; }
-.d-eye { display: inline-flex; padding: 2px; border-radius: 5px; color: #6e6e73; }
-.d-eye:hover { background: rgba(0,0,0,.06); }
-.d-eye svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+/* ── header: VStack(spacing:2) padding 12 ── */
+.d-head { padding: 12px; display: flex; flex-direction: column; gap: 2px; }
+.d-label { display: flex; align-items: baseline; font-size: 10px; color: rgba(0,0,0,.5); }
+.d-updated { margin-left: auto; color: rgba(0,0,0,.26); }
+.demo .d-eye { display: inline-flex; margin-left: 8px; color: rgba(0,0,0,.26); align-self: center; }
+.demo .d-eye:hover { color: rgba(0,0,0,.5); }
+.d-eye svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
 .d-value {
-  font-size: 26px; font-weight: 600; letter-spacing: -0.01em; margin: 1px 0;
+  font-size: 26px; font-weight: 600; line-height: 1.2;
   font-family: ui-rounded, "SF Pro Rounded", var(--sans); font-variant-numeric: tabular-nums;
 }
-.d-delta { font-size: 12px; font-weight: 600; color: #219947; font-variant-numeric: tabular-nums; }
-.d-delta.down { color: #D12E24; }
+.d-delta { font-size: 10px; font-weight: 500; color: #28CD41; font-variant-numeric: tabular-nums; }
+.d-delta.down { color: #FF3B30; }
+.d-delta.flat { color: rgba(0,0,0,.5); font-weight: 400; }
 
-/* ── tabs ── */
+/* ── SegmentedBar: track radius 7, fill secondary@13%, pad 2, gap 2; segment radius 5 ── */
 .d-tabs {
-  display: flex; gap: 2px; margin: 10px 12px 0; padding: 2px;
-  background: rgba(0,0,0,.055); border-radius: 8px; flex-shrink: 0;
+  display: flex; gap: 2px; margin: 8px 12px 0; padding: 2px;
+  background: rgba(0,0,0,.065); border-radius: 7px; flex-shrink: 0;
 }
-.d-tab {
-  flex: 1; text-align: center; font-size: 11.5px; padding: 4px 0 5px;
-  border-radius: 6px; color: #3a3a3c; position: relative;
+.demo .d-tab {
+  flex: 1; display: flex; justify-content: center; align-items: center; gap: 3px;
+  font-size: 10px; padding: 4px 0; border-radius: 5px;
+  color: rgba(0,0,0,.64); white-space: nowrap;
 }
-.d-tab:hover { color: #1d1d1f; }
-.d-tab.on { background: #007AFF; color: #fff; font-weight: 600; }
-.d-tab .dot {
-  display: inline-block; width: 5px; height: 5px; border-radius: 50%;
-  background: #007AFF; margin-left: 4px; vertical-align: 2px;
-}
+.demo .d-tab.on { background: #007AFF; color: #fff; font-weight: 600; }
+.d-tab .dot { width: 4px; height: 4px; border-radius: 50%; background: #007AFF; }
 .d-tab.on .dot { background: #fff; }
 
-/* ── content ── */
-.d-body { flex: 1; overflow-y: auto; padding: 10px 14px 12px; }
-.d-body::-webkit-scrollbar { width: 8px; }
-.d-body::-webkit-scrollbar-thumb { background: rgba(0,0,0,.18); border-radius: 4px; }
+/* ── tab body (height set per-tab by JS, mirroring the computed frame heights) ── */
+.d-body { overflow-y: auto; overflow-x: hidden; flex-shrink: 0; }
+.d-body::-webkit-scrollbar { width: 7px; }
+.d-body::-webkit-scrollbar-thumb { background: rgba(0,0,0,.16); border-radius: 4px; }
 
-/* chips (allocation modes, trend ranges, activity filters) */
-.d-chips { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
-.d-chip {
-  font-size: 11px; padding: 3px 10px 4px; border-radius: 999px;
-  background: rgba(0,0,0,.06); color: #3a3a3c;
+/* PillRow: HStack(spacing:5), left-aligned; chip = capsule h20, pad-h 9, micro 10px */
+.d-chips { display: flex; gap: 5px; padding: 8px 12px 0; flex-wrap: wrap; }
+.demo .d-chip {
+  font-size: 10px; padding: 0 9px; height: 20px; display: inline-flex; align-items: center;
+  border-radius: 999px; background: rgba(0,0,0,.065); color: rgba(0,0,0,.5);
 }
-.d-chip:hover { background: rgba(0,0,0,.1); }
-.d-chip.on { background: #007AFF; color: #fff; font-weight: 600; }
+.demo .d-chip.on { background: #007AFF; color: #fff; font-weight: 600; }
 
-/* accounts */
-.d-grp { display: flex; justify-content: space-between; font-size: 11.5px; color: #6e6e73; font-weight: 650; margin: 10px 2px 3px; }
-.d-grp:first-child { margin-top: 2px; }
-.d-acct { width: 100%; display: flex; align-items: baseline; gap: 6px; padding: 5px 2px 1px; border-radius: 7px; }
-.d-acct:hover { background: rgba(0,0,0,.045); }
-.d-acct .chev { flex-shrink: 0; align-self: center; width: 11px; height: 11px; stroke: #8a8a8e; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform .15s ease; }
+/* ── Accounts: content VStack(spacing:4) pad h12 v8 ── */
+.d-list { display: flex; flex-direction: column; gap: 4px; padding: 8px 12px; }
+.d-grp-head { display: flex; align-items: baseline; padding-top: 6px; font-size: 10px; font-weight: 600; color: rgba(0,0,0,.5); }
+.d-grp-head .amt { margin-left: auto; font-variant-numeric: tabular-nums; }
+.d-grp { display: flex; flex-direction: column; gap: 2px; }
+.demo .d-acct { display: flex; align-items: baseline; gap: 8px; padding: 2px 0; width: 100%; }
+.d-acct .chev { flex-shrink: 0; width: 8px; height: 8px; align-self: center; stroke: rgba(0,0,0,.26); fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; transition: transform .12s ease; }
 .d-acct.open .chev { transform: rotate(90deg); }
-.d-acct .nm { font-size: 14px; }
-.d-acct .amt { margin-left: auto; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.d-sub { font-size: 11px; color: #8a8a8e; margin: 0 2px 4px 19px; }
-.d-holdings { margin: 2px 2px 6px 19px; display: none; }
-.d-acct.open + .d-sub + .d-holdings { display: block; }
-.d-hold { display: flex; align-items: baseline; padding: 3px 0; }
-.d-hold .t { font-size: 12.5px; font-weight: 600; }
-.d-hold .q { font-size: 10.5px; color: #8a8a8e; }
-.d-hold .right { margin-left: auto; text-align: right; }
-.d-hold .v { font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.d-hold .chg { font-size: 10.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.chg.up { color: #219947; } .chg.down { color: #D12E24; }
+.d-acct .col { display: flex; flex-direction: column; min-width: 0; }
+.d-acct .nm { font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.d-acct .sync { font-size: 10px; color: rgba(0,0,0,.26); }
+.d-acct .amt { margin-left: auto; font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 
-/* allocation */
-.d-donut { display: grid; place-items: center; position: relative; margin: 4px 0 10px; }
-.d-donut svg { width: 168px; height: 168px; }
-.d-donut .c { position: absolute; text-align: center; }
-.d-donut .c b { display: block; font-size: 19px; font-weight: 650; font-family: ui-rounded, "SF Pro Rounded", var(--sans); }
-.d-donut .c span { font-size: 11px; color: #8a8a8e; }
-.d-leg { display: flex; flex-direction: column; gap: 1px; }
-.d-leg-row { display: flex; align-items: center; gap: 8px; padding: 3.5px 2px; font-size: 12.5px; }
-.d-leg-row .sw { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
-.d-leg-row .lv { margin-left: auto; font-weight: 600; font-variant-numeric: tabular-nums; }
-.d-leg-row .lp { width: 44px; text-align: right; color: #8a8a8e; font-variant-numeric: tabular-nums; }
+/* breakdown: VStack(spacing:1) pad-left 18 pad-bottom 4; rows pad-v 1 */
+.d-break { display: flex; flex-direction: column; gap: 1px; padding: 0 0 4px 18px; }
+.d-hold { display: flex; align-items: baseline; padding: 1px 0; }
+.d-hold .col { display: flex; flex-direction: column; min-width: 0; }
+.d-hold .t { font-size: 10px; font-weight: 500; white-space: nowrap; }
+.d-hold .q { font-size: 10px; color: rgba(0,0,0,.26); white-space: nowrap; }
+.d-hold .right { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; }
+.d-hold .v { font-size: 10px; color: rgba(0,0,0,.5); font-variant-numeric: tabular-nums; }
+.d-hold .m { font-size: 9px; font-variant-numeric: tabular-nums; display: flex; gap: 4px; }
+.up { color: #28CD41; } .down { color: #FF3B30; }
 
-/* trend */
-.d-trend-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; font-size: 11.5px; }
-.d-trend-head .rng { font-weight: 650; font-variant-numeric: tabular-nums; }
-.d-trend-head .since { color: #8a8a8e; }
-.d-chart { width: 100%; height: auto; display: block; }
-.d-chart-note { font-size: 10.5px; color: #8a8a8e; margin-top: 8px; }
+/* ── Allocation: VStack(spacing:10) pad 12/8/12/10 ── */
+.d-alloc { display: flex; flex-direction: column; gap: 10px; padding: 8px 12px 10px; }
+.d-alloc .d-chips { padding: 0; }
+.d-donut { position: relative; height: 155px; display: grid; place-items: center; }
+.d-donut svg { height: 155px; width: 155px; display: block; }
+.d-donut .center { position: absolute; text-align: center; display: flex; flex-direction: column; gap: 1px; align-items: center; pointer-events: none; }
+.d-donut .center .fig { font-size: 17px; font-weight: 600; font-family: ui-rounded, "SF Pro Rounded", var(--sans); font-variant-numeric: tabular-nums; }
+.d-donut .center .figS { font-size: 15px; font-weight: 600; font-family: ui-rounded, "SF Pro Rounded", var(--sans); font-variant-numeric: tabular-nums; }
+.d-donut .center .nm { font-size: 10px; font-weight: 600; max-width: 78px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.d-donut .center .sub { font-size: 10px; color: rgba(0,0,0,.26); }
+.d-leg { display: flex; flex-direction: column; gap: 2px; }
+.d-leg-row { display: flex; align-items: center; gap: 7px; padding: 2px 5px; border-radius: 4px; font-size: 10px; }
+.d-leg-row .sw { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+.d-leg-row .lnm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.d-leg-row.hov .lnm { font-weight: 600; }
+.d-leg-row .lv { margin-left: auto; color: rgba(0,0,0,.5); font-variant-numeric: tabular-nums; }
+.d-leg-row.hov .lv { color: rgba(0,0,0,.85); }
+.d-leg-row .lp { width: 42px; text-align: right; color: rgba(0,0,0,.26); font-variant-numeric: tabular-nums; white-space: pre; }
 
-/* activity */
-.d-day { font-size: 11.5px; color: #6e6e73; font-weight: 650; margin: 10px 2px 4px; }
-.d-day:first-of-type { margin-top: 2px; }
-.d-act { display: flex; align-items: center; gap: 9px; padding: 4px 2px; }
-.d-act .ic {
-  width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
-  display: grid; place-items: center; color: #fff; font-size: 11px; font-weight: 700;
+/* ── Trend: VStack(spacing:8) pad 12/8/12/10; frame height 268 ── */
+.d-trend { display: flex; flex-direction: column; gap: 8px; padding: 8px 12px 10px; height: 268px; }
+.d-trend .d-chips { padding: 0; }
+.d-thead { display: flex; flex-direction: column; gap: 1px; }
+.d-thead .l1 { display: flex; align-items: baseline; font-size: 10px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.d-thead .l1 .since { margin-left: auto; font-weight: 400; color: rgba(0,0,0,.26); }
+.d-thead .l2 { font-size: 10px; font-variant-numeric: tabular-nums; }
+.d-chart-wrap { flex: 1; min-height: 0; }
+.d-chart { width: 100%; height: 100%; display: block; }
+.d-foot-note { font-size: 9px; color: rgba(0,0,0,.26); }
+
+/* ── Activity ── */
+.d-acts { display: flex; flex-direction: column; gap: 2px; padding: 8px 12px; }
+.d-day { font-size: 10px; font-weight: 600; color: rgba(0,0,0,.5); padding-top: 7px; }
+.d-act { display: flex; align-items: baseline; gap: 8px; padding: 2px 0; }
+.d-act .ic { width: 16px; flex-shrink: 0; display: flex; justify-content: center; align-self: center; }
+.d-act .ic .disc { width: 13px; height: 13px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-size: 8px; font-weight: 700; line-height: 1; }
+.d-act .col { display: flex; flex-direction: column; min-width: 0; }
+.d-act .ttl { font-size: 12px; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+.d-act .ttl .new { width: 6px; height: 6px; border-radius: 50%; background: #007AFF; flex-shrink: 0; }
+.d-act .sub { font-size: 10px; color: rgba(0,0,0,.26); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.d-act .amt { margin-left: auto; font-size: 10px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* empty states */
+.d-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; height: 100%; color: rgba(0,0,0,.5); font-size: 12px; }
+.d-empty .glyph { font-size: 26px; color: rgba(0,0,0,.1); }
+
+/* ── footer: HStack pad 10; macOS regular bordered push buttons ── */
+.d-foot { display: flex; align-items: center; gap: 8px; padding: 10px; flex-shrink: 0; }
+.demo .d-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: linear-gradient(#FFFFFF, #F9F9F9);
+  border: 1px solid rgba(0,0,0,.17) !important; border-radius: 5.5px;
+  box-shadow: 0 .5px 1px rgba(0,0,0,.08);
+  padding: 2.5px 9px; font-size: 13px; color: rgba(0,0,0,.85);
 }
-.d-act .ttl { font-size: 13px; font-weight: 550; }
-.d-act .ttl .dot { display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: #007AFF; margin-left: 5px; vertical-align: 2px; }
-.d-act .sub { font-size: 10.5px; color: #8a8a8e; }
-.d-act .amt { margin-left: auto; font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.d-act .amt.up { color: #219947; }
+.demo .d-btn:active { background: #E9E9EA; }
+.d-btn[disabled] { opacity: .45; pointer-events: none; }
+.d-btn svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.demo .d-more { margin-left: auto; width: 30px; display: flex; justify-content: center; color: rgba(0,0,0,.6); }
+.d-more svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.4; stroke-linecap: round; }
 
-/* footer */
-.d-foot {
-  display: flex; align-items: center; gap: 8px;
-  padding: 10px 12px; border-top: 1px solid rgba(0,0,0,.08); flex-shrink: 0;
-}
-.d-btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  background: rgba(0,0,0,.06); border-radius: 8px; padding: 6px 13px;
-  font-size: 13px; font-weight: 550;
-}
-.d-btn:hover { background: rgba(0,0,0,.1); }
-.d-btn svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.d-more { margin-left: auto; color: #3a3a3c; padding: 4px 6px; border-radius: 6px; }
-.d-more:hover { background: rgba(0,0,0,.06); }
 .d-toast {
-  position: absolute; left: 50%; bottom: 54px; transform: translateX(-50%) translateY(4px);
-  background: #1d1d1f; color: #fff; font-size: 11.5px; padding: 6px 12px; border-radius: 8px;
-  opacity: 0; pointer-events: none; transition: opacity .18s ease, transform .18s ease; white-space: nowrap;
+  position: absolute; left: 50%; bottom: 48px; transform: translateX(-50%) translateY(4px);
+  background: rgba(0,0,0,.85); color: #fff; font-size: 11px; padding: 5px 11px; border-radius: 7px;
+  opacity: 0; pointer-events: none; transition: opacity .18s ease, transform .18s ease; white-space: nowrap; z-index: 2;
 }
-.d-toast.show { opacity: .95; transform: translateX(-50%) translateY(0); }
-.demo { position: relative; }
+.d-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
 @keyframes d-spin { to { transform: rotate(360deg); } }
-.d-btn .spin { animation: d-spin .6s linear; }
+.spin { animation: d-spin .7s linear infinite; display: inline-flex; }
 
 .demo-note { font-size: 12px; color: var(--muted); }
