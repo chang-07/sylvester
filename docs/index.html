@@ -118,14 +118,22 @@ h1 em::after {
 }
 .copy:hover { color: var(--ink); border-color: var(--ink); }
 
-/* ── product shots (real app, example data) ── */
-.mock { display: flex; flex-direction: column; align-items: center; gap: 10px; }
-.appshot { width: 100%; max-width: 380px; height: auto; display: block; border-radius: 15px; box-shadow: var(--shadow); }
-.shot-note { font-size: 12px; color: var(--muted); }
-.shots { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 380px)); gap: clamp(18px, 4vw, 40px); justify-content: center; }
-.shot { margin: 0; }
-.shot img { width: 100%; height: auto; display: block; border-radius: 15px; box-shadow: var(--shadow-sm); }
-.shot figcaption { font-size: 13px; color: var(--muted); margin-top: 10px; text-align: center; }
+/* ── designed shots (real app captures on staged scenes) ── */
+.shots { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 420px)); gap: clamp(18px, 4vw, 40px); justify-content: center; }
+.shot {
+  margin: 0; background: var(--card); border: 1px solid var(--line); border-radius: 18px;
+  overflow: hidden; box-shadow: var(--shadow-sm);
+  transition: transform .2s ease, box-shadow .3s ease;
+}
+.shot:hover { transform: translateY(-5px); box-shadow: var(--shadow); }
+.shot img { width: 100%; height: auto; display: block; }
+.shot figcaption {
+  display: flex; align-items: center; gap: 8px;
+  padding: 13px 16px; font-size: 13.5px; font-weight: 550; color: var(--ink-2);
+  border-top: 1px solid var(--line); background: var(--card);
+}
+.shot figcaption::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--gain); flex: none; }
+.hero-shot { max-width: 460px; margin-inline: auto; }
 
 /* ── sections ── */
 section.band { padding: clamp(46px, 7vw, 82px) 0; border-top: 1px solid var(--line); }
@@ -228,11 +236,11 @@ footer { border-top: 1px solid var(--line); padding: 30px 0 44px; font-size: 13.
       </div>
     </div>
 
-    <div class="mock">
-      <img class="appshot" src="assets/app-accounts.png" width="680" height="826"
-           alt="Sylvester's popover: net worth $173,873.92 across demo accounts at Fidelity, Wealthsimple, and Robinhood, with today's change and per-account sync status. Example data." />
-      <p class="shot-note">Example data.</p>
-    </div>
+    <figure class="shot hero-shot">
+      <img src="assets/shot-accounts.png" width="1680" height="2240"
+           alt="Sylvester open in the macOS menubar: the popover lists demo accounts at Fidelity, Wealthsimple, and Robinhood totalling $173,873.92. Example data." />
+      <figcaption>Accounts — every brokerage, grouped.</figcaption>
+    </figure>
   </div>
 </section>
 
@@ -240,12 +248,12 @@ footer { border-top: 1px solid var(--line); padding: 30px 0 44px; font-size: 13.
   <h2>The rest of the popover</h2>
   <div class="shots">
     <figure class="shot">
-      <img src="assets/app-allocation.png" width="680" height="1130" loading="lazy"
+      <img src="assets/shot-allocation.png" width="1680" height="2240" loading="lazy"
            alt="Allocation tab: a donut chart of the example portfolio by asset, with per-holding values and percentages. Example data." />
       <figcaption>Allocation — by asset, account, or currency.</figcaption>
     </figure>
     <figure class="shot">
-      <img src="assets/app-activity.png" width="680" height="1050" loading="lazy"
+      <img src="assets/shot-activity.png" width="1680" height="2240" loading="lazy"
            alt="Activity tab: a day-grouped feed of dividends, buys, and contributions across the example accounts. Example data." />
       <figcaption>Activity — dividends, trades, and deposits, day by day.</figcaption>
     </figure>
