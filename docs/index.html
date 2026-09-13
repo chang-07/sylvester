@@ -61,7 +61,7 @@ a { color: inherit; }
 @media (max-width: 620px) { .nav-links a:not(.nav-cta) { display: none; } }
 
 /* ── hero ── */
-.hero { padding: clamp(36px, 7vw, 76px) 0 clamp(40px, 7vw, 84px); }
+.hero { padding-block: clamp(36px, 7vw, 76px) clamp(40px, 7vw, 84px); }
 .hero-grid {
   display: grid; grid-template-columns: 1.02fr 0.98fr;
   gap: clamp(28px, 5vw, 60px); align-items: center;
@@ -128,7 +128,7 @@ h1 em::after {
 .shot figcaption { font-size: 13px; color: var(--muted); margin-top: 10px; text-align: center; }
 
 /* ── sections ── */
-section.band { padding: clamp(46px, 7vw, 82px) 0; border-top: 1px solid var(--line); }
+section.band { padding-block: clamp(46px, 7vw, 82px); border-top: 1px solid var(--line); }
 h2 { font-size: clamp(25px, 3.4vw, 33px); letter-spacing: -0.026em; font-weight: 700; margin-bottom: 10px; }
 .lede { color: var(--ink-2); max-width: 58ch; font-size: 16.5px; margin-bottom: 34px; }
 
