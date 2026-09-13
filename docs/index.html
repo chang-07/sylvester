@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Sylvester — your net worth, every brokerage, in the menubar</title>
-<meta name="description" content="Sylvester is a macOS menubar app showing your net worth and per-account breakdown across every brokerage you've linked in SnapTrade. Read-only, local-first, tokens in your Keychain, no server." />
+<title>Sylvester — your broker, in your menubar</title>
+<meta name="description" content="Net worth and holdings across every linked brokerage, in your macOS menubar. Read-only, no server, no telemetry." />
 <link rel="icon" type="image/svg+xml" href="assets/sylvester-logo.svg" />
-<meta property="og:title" content="Sylvester — your net worth, every brokerage, in the menubar" />
-<meta property="og:description" content="A macOS menubar app for net worth across every brokerage you've linked in SnapTrade. Read-only, local-first, no server." />
+<meta property="og:title" content="Sylvester — your broker, in your menubar" />
+<meta property="og:description" content="Net worth and holdings across every linked brokerage, in your macOS menubar." />
 <meta property="og:type" content="website" />
 <style>
 :root {
@@ -200,10 +200,9 @@ footer { border-top: 1px solid var(--line); padding: 30px 0 44px; font-size: 13.
   <div class="hero-grid">
     <div>
       <p class="eyebrow">macOS menubar app</p>
-      <h1>Every brokerage, <em>one number</em>.</h1>
+      <h1>Your broker, in your <em>menubar</em>.</h1>
       <p class="hero-sub">
-        Your net worth and per-account breakdown across every brokerage you've
-        linked in SnapTrade — sitting in your menubar, updating on its own.
+        Net worth and holdings across every linked brokerage, updating on its own.
       </p>
 
       <ul class="chips">
@@ -233,17 +232,13 @@ footer { border-top: 1px solid var(--line); padding: 30px 0 44px; font-size: 13.
     <div class="mock">
       <img class="appshot" src="assets/app-accounts.png" width="680" height="826"
            alt="Sylvester's popover: net worth $173,873.92 across demo accounts at Fidelity, Wealthsimple, and Robinhood, with today's change and per-account sync status. Example data." />
-      <p class="shot-note">The actual app, showing example data.</p>
+      <p class="shot-note">Example data.</p>
     </div>
   </div>
 </section>
 
 <section class="band wrap" id="tour">
   <h2>The rest of the popover</h2>
-  <p class="lede">
-    Same window, three more tabs — allocation across everything you hold,
-    a net-worth trend, and every dividend, trade, and deposit in one feed.
-  </p>
   <div class="shots">
     <figure class="shot">
       <img src="assets/app-allocation.png" width="680" height="1130" loading="lazy"
@@ -260,41 +255,37 @@ footer { border-top: 1px solid var(--line); padding: 30px 0 44px; font-size: 13.
 
 <section class="band wrap" id="features">
   <h2>What it does</h2>
-  <p class="lede">
-    One place for accounts that otherwise live in four different apps, each of
-    which can only ever show you its own slice.
-  </p>
 
   <div class="grid">
     <div class="card">
       <div class="ico"><svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8"/><path d="M21 3v6h-6"/></svg></div>
       <h3>Net worth at a glance</h3>
-      <p>The total lives in your menubar with today's change beside it, in your base currency, converted at live FX rates.</p>
+      <p>The total in your menubar with today's change, converted at live FX rates.</p>
     </div>
     <div class="card">
       <div class="ico"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M9 10v10"/></svg></div>
       <h3>Every account, grouped</h3>
-      <p>Balances by institution, expandable into individual holdings with quantities, prices, day change and open P&amp;L.</p>
+      <p>Balances by institution, expandable into holdings with prices, day change and P&amp;L.</p>
     </div>
     <div class="card">
       <div class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3v9l6.4 6.4"/></svg></div>
       <h3>Real allocation</h3>
-      <p>A donut across <em>all</em> your accounts at once, by asset, account or currency — the view no single brokerage can give you.</p>
+      <p>One donut across all accounts, by asset, account or currency.</p>
     </div>
     <div class="card">
       <div class="ico"><svg viewBox="0 0 24 24"><path d="M3 18l5-6 4 3 4-7 5 5"/></svg></div>
       <h3>Net worth over time</h3>
-      <p>1D through 1Y, with a second dashed line showing growth excluding your own deposits and withdrawals.</p>
+      <p>1D through 1Y, with a dashed line excluding your own deposits.</p>
     </div>
     <div class="card">
       <div class="ico"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 1 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></div>
       <h3>Activity and alerts</h3>
-      <p>Dividends, trades and deposits as they land — quietly. A connection breaking gets a sound and a one-click Reconnect.</p>
+      <p>Dividends, trades and deposits as they land. Broken connections get a one-click Reconnect.</p>
     </div>
     <div class="card">
       <div class="ico"><svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><path d="M3 3l18 18"/></svg></div>
       <h3>Privacy mode</h3>
-      <p>Blank every figure with one click, so you can screen-share or screenshot without redacting anything by hand.</p>
+      <p>Blank every figure with one click for screenshots and screen-shares.</p>
     </div>
   </div>
 </section>
@@ -302,16 +293,13 @@ footer { border-top: 1px solid var(--line); padding: 30px 0 44px; font-size: 13.
 <section class="band wrap" id="privacy">
   <div class="privacy">
     <h2>It cannot move your money</h2>
-    <p class="lede">
-      That's not a policy — it's the shape of the connection. Worth being precise about,
-      because you're linking brokerage accounts to something you found on the internet.
-    </p>
+
     <ul>
-      <li><svg class="tick" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span><strong>Read-only by construction.</strong> Sign-in uses OAuth2 with PKCE, scoped to <code>read</code>. Placing a trade or moving money isn't something it declines to do — it's something the token can't authorize.</span></li>
-      <li><svg class="tick" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span><strong>There is no Sylvester server.</strong> Your Mac talks to SnapTrade directly — sign-in included. Nothing is relayed through, logged by, or stored on infrastructure belonging to this app, because none exists.</span></li>
-      <li><svg class="tick" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span><strong>Tokens live in your Keychain.</strong> Never written to disk in plaintext, never in the config file, never transmitted anywhere but SnapTrade.</span></li>
-      <li><svg class="tick" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span><strong>No analytics of any kind.</strong> No crash reporting, no usage pings, no accounts. Net-worth history is a JSON file in <code>~/.config/sylvester</code> that only you ever read.</span></li>
-      <li><svg class="tick" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span><strong>The source is right there.</strong> Every claim above is checkable in a few thousand lines of Swift rather than taken on trust.</span></li>
+      <li><svg class="tick" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span><strong>Read-only.</strong> OAuth2 with PKCE, scoped to <code>read</code>. The token can't place trades or move money.</span></li>
+      <li><svg class="tick" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span><strong>No Sylvester server.</strong> Your Mac talks to the API directly, sign-in included.</span></li>
+      <li><svg class="tick" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span><strong>Tokens live in your Keychain.</strong> Never on disk in plaintext, never sent anywhere else.</span></li>
+      <li><svg class="tick" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span><strong>No analytics.</strong> No crash reporting, no usage pings, no accounts.</span></li>
+      <li><svg class="tick" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span><strong>Open source.</strong> Read the code yourself.</span></li>
     </ul>
   </div>
 </section>
@@ -325,26 +313,20 @@ footer { border-top: 1px solid var(--line); padding: 30px 0 44px; font-size: 13.
       <pre><code>brew install --cask chang-07/tap/sylvester</code></pre></div></div>
     <div class="step"><div><strong>Clear the quarantine flag.</strong> Sylvester is ad-hoc signed rather than notarized, so macOS blocks it once on first open.
       <pre><code>xattr -dr com.apple.quarantine /Applications/Sylvester.app</code></pre></div></div>
-    <div class="step"><div><strong>Sign in.</strong> Click the menubar icon and follow the four-step setup. Your browser opens to approve read access — there's no key to copy or paste.</div></div>
-    <div class="step"><div><strong>Link a brokerage.</strong> The SnapTrade portal opens; your accounts appear as soon as the connection lands.</div></div>
+    <div class="step"><div><strong>Sign in.</strong> Click the menubar icon; your browser opens to approve read access.</div></div>
+    <div class="step"><div><strong>Link a brokerage.</strong> The connection portal opens; your accounts appear once it lands.</div></div>
   </div>
 
-  <p class="note">
-    Coming from SnapBar? Sylvester is the same app, renamed. Your connection,
-    preferences and net-worth history carry over on first launch — macOS asks
-    once for Keychain access, and your old data is copied rather than moved.
-  </p>
 </section>
 
 </main>
 
 <footer>
   <div class="wrap foot">
-    <span>Sylvester — an open-source macOS menubar app, not an official SnapTrade product.</span>
+    <span>Sylvester — open source, not an official SnapTrade product.</span>
     <span>
       <a href="https://github.com/chang-07/sylvester">GitHub</a> ·
       <a href="https://github.com/chang-07/sylvester/releases/latest">Releases</a> ·
-      <a href="https://snaptrade.com">SnapTrade</a> ·
       <a href="/privacy">Privacy</a> ·
       <a href="/terms">Terms</a>
     </span>
