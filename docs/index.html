@@ -9,6 +9,8 @@
 <meta property="og:title" content="Sylvester — your net worth, every brokerage, in the menubar" />
 <meta property="og:description" content="A macOS menubar app for net worth across every brokerage you've linked in SnapTrade. Read-only, local-first, no server." />
 <meta property="og:type" content="website" />
+<link rel="stylesheet" href="demo.css" />
+<script src="demo.js" defer></script>
 <style>
 :root {
   --paper:   #FBF8F2;
@@ -118,33 +120,6 @@ h1 em::after {
 }
 .copy:hover { color: var(--ink); border-color: var(--ink); }
 
-/* ── product shots (real app, example data) ── */
-.mock { display: flex; flex-direction: column; align-items: center; gap: 12px; }
-.stage {
-  background: linear-gradient(165deg, #2A2A30 0%, #17171A 48%, #0B0B0D 100%);
-  border: 1px solid #FFFFFF1A;
-  border-radius: 20px;
-  padding: 0 16px 16px;
-  box-shadow: var(--shadow);
-  width: 100%; max-width: 430px;
-}
-.menustrip {
-  display: flex; justify-content: flex-end; align-items: center; gap: 14px;
-  color: #E8E8EA; font-size: 12px; padding: 9px 4px 8px;
-}
-.menustrip .pill { font-weight: 550; display: flex; align-items: center; gap: 6px; }
-.menustrip .up { color: #3ED47A; font-weight: 650; }
-.menustrip .dim { color: #9A9AA2; }
-.appshot, .shot img { width: 100%; height: auto; display: block; border-radius: 12px; }
-.shot-note { font-size: 12px; color: var(--muted); }
-.shots {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 400px));
-  gap: clamp(18px, 4vw, 40px); justify-content: center;
-}
-.shot { margin: 0; display: flex; flex-direction: column; gap: 10px; }
-.shot .stage { padding: 14px; max-width: none; }
-.shot figcaption { font-size: 13px; color: var(--muted); text-align: center; }
-
 /* ── sections ── */
 section.band { padding: clamp(46px, 7vw, 82px) 0; border-top: 1px solid var(--line); }
 h2 { font-size: clamp(25px, 3.4vw, 33px); letter-spacing: -0.026em; font-weight: 700; margin-bottom: 10px; }
@@ -248,37 +223,15 @@ footer { border-top: 1px solid var(--line); padding: 30px 0 44px; font-size: 13.
       </div>
     </div>
 
-    <div class="mock" aria-label="Sylvester in the macOS menubar">
-      <div class="stage">
-        <div class="menustrip" aria-hidden="true">
-          <span class="pill">$173.9k <span class="up">&#9650;1.24%</span></span>
-          <span class="dim">Fri 9:41</span>
-        </div>
-        <img class="appshot" src="assets/app-accounts.png" width="680" height="826"
-             alt="Sylvester's popover: net worth $173,873.92 across demo accounts at Fidelity, Wealthsimple, and Robinhood, with today's change and per-account sync status. Example data." />
+    <div class="demo-wrap" aria-label="Interactive demo of the Sylvester popover">
+      <div class="demo-menubar" aria-hidden="true">
+        <span class="pill">$173.9k <span class="up">&#9650;1.24%</span></span>
+        <span class="dim">Fri 9:41</span>
       </div>
-      <p class="shot-note">The actual app, showing example data.</p>
+      <div id="sylvester-demo"></div>
+      <p class="demo-note">A live recreation you can click through — all example data.</p>
+      <noscript><p class="demo-note">Enable JavaScript to try the interactive demo.</p></noscript>
     </div>
-  </div>
-</section>
-
-<section class="band wrap" id="tour">
-  <h2>The rest of the popover</h2>
-  <p class="lede">
-    Same window, three more tabs — allocation across everything you hold,
-    a net-worth trend, and every dividend, trade, and deposit in one feed.
-  </p>
-  <div class="shots">
-    <figure class="shot">
-      <div class="stage"><img src="assets/app-allocation.png" width="680" height="1130" loading="lazy"
-           alt="Allocation tab: a donut chart of the example portfolio by asset, with per-holding values and percentages. Example data." /></div>
-      <figcaption>Allocation — by asset, account, or currency.</figcaption>
-    </figure>
-    <figure class="shot">
-      <div class="stage"><img src="assets/app-activity.png" width="680" height="1050" loading="lazy"
-           alt="Activity tab: a day-grouped feed of dividends, buys, and contributions across the example accounts. Example data." /></div>
-      <figcaption>Activity — dividends, trades, and deposits, day by day.</figcaption>
-    </figure>
   </div>
 </section>
 
