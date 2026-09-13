@@ -148,13 +148,19 @@ h2 { font-size: clamp(25px, 3.4vw, 33px); letter-spacing: -0.026em; font-weight:
 
 .privacy { background: #0A0A0C; border: 1px solid var(--line); color: var(--ink); border-radius: 18px; padding: clamp(28px, 4.5vw, 44px); }
 .privacy h2 { color: var(--ink); }
-.privacy .lede { color: #C9C6BE; }
-.privacy ul { list-style: none; display: grid; gap: 14px; }
-.privacy li { display: flex; gap: 12px; align-items: flex-start; font-size: 14.5px; color: #DEDBD4; }
-  .privacy li span { min-width: 0; }
-.privacy li strong { color: var(--ink); font-weight: 620; }
-.privacy .tick { flex-shrink: 0; margin-top: 3px; width: 16px; height: 16px; stroke: #8FD9AC; fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.privacy .sub { color: var(--muted); font-size: 15px; margin-top: 4px; }
+.pgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(195px, 1fr)); gap: 14px; margin-top: 28px; }
+.ptile { background: rgba(255,255,255,.03); border: 1px solid var(--line); border-radius: 13px; padding: 20px 18px; }
+.ptile svg { width: 22px; height: 22px; stroke: var(--gain); fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; margin-bottom: 13px; }
+.ptile h3 { font-size: 15px; font-weight: 650; letter-spacing: -0.01em; margin-bottom: 5px; }
+.ptile p { font-size: 13.5px; color: #B9B6AE; line-height: 1.5; }
+.ptile code { font-size: .88em; background: rgba(255,255,255,.07); padding: 1px 5px; border-radius: 5px; }
+.pfoot { margin-top: 24px; font-size: 14px; color: var(--muted); }
+.pfoot a { color: var(--ink-2); text-decoration: underline; text-underline-offset: 3px; }
+.pfoot a:hover { color: var(--ink); }
 
+.coffee-line { margin-top: 38px; display: flex; align-items: center; flex-wrap: wrap; gap: 16px; color: var(--muted); font-size: 14.5px; }
+.btn-coffee { padding: 9px 18px; font-size: 14px; }
 .steps { display: grid; gap: 14px; counter-reset: s; max-width: 640px; }
 .step { display: flex; gap: 14px; align-items: flex-start; min-width: 0; }
 .step::before {
@@ -174,7 +180,7 @@ pre code { font-family: var(--mono); font-size: 12.5px; }
 .note { font-size: 13.5px; color: var(--muted); margin-top: 22px; max-width: 62ch; }
 
 footer { border-top: 1px solid var(--line); padding: 30px 0 44px; font-size: 13.5px; color: var(--muted); }
-.foot { display: flex; flex-wrap: wrap; gap: 18px; justify-content: space-between; align-items: center; }
+.foot { display: flex; flex-wrap: wrap; gap: 18px; justify-content: center; align-items: center; }
 .foot a { color: var(--ink-2); text-decoration: none; }
 .foot a:hover { color: var(--ink); }
 </style>
@@ -255,14 +261,30 @@ footer { border-top: 1px solid var(--line); padding: 30px 0 44px; font-size: 13.
 <section class="band wrap" id="privacy">
   <div class="privacy">
     <h2>It cannot move your money</h2>
-
-    <ul>
-      <li><svg class="tick" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span><strong>Read-only.</strong> OAuth2 with PKCE, scoped to <code>read</code>. The token can't place trades or move money.</span></li>
-      <li><svg class="tick" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span><strong>No Sylvester server.</strong> Your Mac talks to the API directly, sign-in included.</span></li>
-      <li><svg class="tick" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span><strong>Tokens live in your Keychain.</strong> Never on disk in plaintext, never sent anywhere else.</span></li>
-      <li><svg class="tick" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span><strong>No analytics.</strong> No crash reporting, no usage pings, no accounts.</span></li>
-      <li><svg class="tick" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg><span><strong>Open source.</strong> Read the code yourself.</span></li>
-    </ul>
+    <p class="sub">Not a policy — the shape of the connection.</p>
+    <div class="pgrid">
+      <div class="ptile">
+        <svg viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.6-3 8.2-7 10-4-1.8-7-5.4-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg>
+        <h3>Read-only</h3>
+        <p>OAuth2 with PKCE, scoped to <code>read</code>. The token can't place trades or move money.</p>
+      </div>
+      <div class="ptile">
+        <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="6" rx="2"/><rect x="3" y="13" width="18" height="6" rx="2"/><path d="M3 3L21 21"/></svg>
+        <h3>No Sylvester server</h3>
+        <p>Your Mac talks to the API directly — sign-in included.</p>
+      </div>
+      <div class="ptile">
+        <svg viewBox="0 0 24 24"><circle cx="8.5" cy="12" r="4.5"/><path d="M13 12h8M18 12v3.5M21 12v2.5"/></svg>
+        <h3>Keychain only</h3>
+        <p>Tokens never touch disk in plaintext, and never go anywhere else.</p>
+      </div>
+      <div class="ptile">
+        <svg viewBox="0 0 24 24"><path d="M3 13h4l2-5 3 8 2.5-6 1.5 3h5"/><path d="M4 4l16 16"/></svg>
+        <h3>No analytics</h3>
+        <p>No crash reporting, no usage pings, no accounts.</p>
+      </div>
+    </div>
+    <p class="pfoot">Don't take any of it on trust — <a href="https://github.com/chang-07/sylvester">read the source</a>.</p>
   </div>
 </section>
 
@@ -279,18 +301,22 @@ footer { border-top: 1px solid var(--line); padding: 30px 0 44px; font-size: 13.
     <div class="step"><div><strong>Link a brokerage.</strong> The connection portal opens; your accounts appear once it lands.</div></div>
   </div>
 
+  <p class="coffee-line">Free, forever. If it earns its spot in your menubar —
+    <a class="btn btn-ghost btn-coffee" href="https://ko-fi.com/chang07" target="_blank" rel="noopener">&#9749; Buy me a coffee</a>
+  </p>
+
 </section>
 
 </main>
 
 <footer>
   <div class="wrap foot">
-    <span>Sylvester — open source, not an official SnapTrade product.</span>
     <span>
       <a href="https://github.com/chang-07/sylvester">GitHub</a> ·
       <a href="https://github.com/chang-07/sylvester/releases/latest">Releases</a> ·
       <a href="/privacy">Privacy</a> ·
-      <a href="/terms">Terms</a>
+      <a href="/terms">Terms</a> ·
+      <a href="https://ko-fi.com/chang07" target="_blank" rel="noopener">Buy me a coffee</a>
     </span>
   </div>
 </footer>
