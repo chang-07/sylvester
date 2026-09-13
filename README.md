@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/title-card.png" alt="Sylvester — your net worth, every brokerage, right in the menubar" width="820">
+  <img src="media/banner-accounts.png" alt="Sylvester — your broker, in your menubar" width="820">
 </p>
 
 <p align="center">
