@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sylvester — Privacy Policy</title>
+<meta name="description" content="Sylvester has no analytics, no accounts, and no server of its own. Your data flows between your Mac, SnapTrade, and the quote services you can read about here." />
+<link rel="icon" type="image/svg+xml" href="assets/sylvester-logo.svg" />
+<meta property="og:title" content="Sylvester — Privacy Policy" />
+<meta property="og:description" content="Local-first by design: no analytics, no accounts, no Sylvester server. Here's exactly where your data goes." />
+<meta property="og:type" content="article" />
+<style>
+:root {
+  --paper: #FBF8F2; --paper-2: #F1EBDD; --ink: #17171A; --ink-2: #3B3B42;
+  --muted: #7C766C; --line: #E5DDCC; --card: #FFFFFF;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--sans); color: var(--ink); line-height: 1.6;
+  background: linear-gradient(180deg, var(--paper) 0%, var(--paper-2) 100%); background-attachment: fixed; }
+a { color: inherit; }
+.wrap { max-width: 760px; margin: 0 auto; padding: 0 clamp(20px, 5vw, 48px); }
+.nav { display: flex; align-items: center; justify-content: space-between; padding: 18px 0; }
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.brand img { width: 30px; height: 30px; border-radius: 7px; }
+.brand span { font-weight: 650; font-size: 17px; letter-spacing: -0.015em; }
+.nav a.back { font-size: 14px; color: var(--ink-2); text-decoration: none; }
+.nav a.back:hover { color: var(--ink); }
+.eyebrow { font-size: 12.5px; letter-spacing: .10em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+h1 { font-size: clamp(32px, 5vw, 44px); letter-spacing: -0.03em; margin: 10px 0 14px; }
+.lede { font-size: 17px; color: var(--ink-2); max-width: 58ch; }
+.updated { font-size: 13px; color: var(--muted); margin-top: 14px; }
+.hero { padding: clamp(28px, 5vw, 56px) 0 clamp(20px, 3vw, 36px); }
+section.doc { background: var(--card); border: 1px solid var(--line); border-radius: 13px;
+  padding: clamp(18px, 3vw, 28px); margin-bottom: 18px; }
+section.doc h2 { font-size: 21px; letter-spacing: -0.02em; margin-bottom: 10px; }
+section.doc p { margin-bottom: 10px; color: var(--ink-2); }
+section.doc ul { padding-left: 20px; color: var(--ink-2); }
+section.doc li { margin-bottom: 8px; }
+section.doc code { font-family: var(--mono); font-size: 0.88em; background: var(--paper-2); padding: 1px 5px; border-radius: 5px; }
+section.doc a { text-decoration: underline; text-underline-offset: 2px; }
+footer { padding: 28px 0 44px; font-size: 13.5px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 8px 18px; justify-content: space-between; }
+footer a { color: var(--ink-2); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="nav">
+  <a class="brand" href="/"><img src="assets/sylvester-logo.svg" alt="" /><span>Sylvester</span></a>
+  <a class="back" href="/">← Back to home</a>
+</header>
+
+<main>
+  <section class="hero">
+    <p class="eyebrow">the legal bit</p>
+    <h1>Privacy Policy</h1>
+    <p class="lede">
+      Short version: Sylvester has no analytics, no accounts, and no server of its own.
+      Your brokerage data flows directly between your Mac and SnapTrade, your tokens live
+      in the macOS Keychain, and the only other services it talks to are a quote feed and
+      an exchange-rate API — detailed below, because you shouldn't have to take that on trust.
+    </p>
+    <p class="updated">Last updated · 12 September 2026</p>
+  </section>
+
+  <section class="doc" id="app">
+    <h2>What Sylvester collects</h2>
+    <p>
+      Nothing, for us — there is no Sylvester server storing your data, no analytics,
+      no crash reporting, no usage pings, and no account to sign up for.
+    </p>
+    <ul>
+      <li><strong>No telemetry.</strong> The app never reports what you view or do to anyone.</li>
+      <li><strong>No Sylvester account.</strong> You sign in with your own SnapTrade account; Sylvester itself has nothing to register.</li>
+      <li><strong>No Sylvester infrastructure in the data path.</strong> Balances, holdings, and activity travel directly between your Mac and SnapTrade's API, authenticated by a token that stays on your machine.</li>
+    </ul>
+  </section>
+
+  <section class="doc" id="flows">
+    <h2>Where your data goes</h2>
+    <p>These are all of the network connections Sylvester makes, and what each one carries:</p>
+    <ul>
+      <li><strong>SnapTrade</strong> — sign-in (OAuth&nbsp;2.0 with PKCE, <code>read</code> scope only) and all account data: balances, holdings, activity, and connection status. The token can't place trades or move money. Signing out deletes the tokens from your Keychain and asks SnapTrade to revoke them server-side. Governed by <a href="https://snaptrade.com/privacy">SnapTrade's privacy policy</a>.</li>
+      <li><strong>Yahoo Finance</strong> — the ticker symbols of your holdings are sent to fetch day-change quotes. No account identity, balances, or quantities accompany them, though the set of tickers itself reveals what you hold.</li>
+      <li><strong>frankfurter.dev</strong> — your base display currency (e.g. <code>USD</code>) is sent to fetch exchange rates. Nothing else.</li>
+    </ul>
+  </section>
+
+  <section class="doc" id="storage">
+    <h2>What stays on your Mac</h2>
+    <ul>
+      <li><strong>Tokens</strong> live in the macOS Keychain — never written to disk in plaintext, never in the config file.</li>
+      <li><strong>Settings and net-worth history</strong> live in <code>~/.config/sylvester</code>, readable only by your user account. The history is a local JSON file that only you (and the app) ever read.</li>
+      <li><strong>Removing everything:</strong> drag Sylvester to the Trash, delete <code>~/.config/sylvester</code>, and remove the <code>com.chang.sylvester</code> item in Keychain Access — or run <code>brew uninstall --zap --cask sylvester</code>. Disconnect brokerages any time from the SnapTrade portal.</li>
+    </ul>
+  </section>
+
+  <section class="doc" id="website">
+    <h2>This website</h2>
+    <p>
+      The page you're reading is static. It sets no cookies and runs no analytics or tracking
+      scripts. It is served by Cloudflare, which — like any web host — keeps standard, short-lived
+      request logs (IP address, browser type) to deliver the site and protect against abuse,
+      under <a href="https://www.cloudflare.com/privacypolicy/">Cloudflare's privacy policy</a>.
+      App downloads are hosted on GitHub Releases (Homebrew fetches the same files), covered by
+      <a href="https://docs.github.com/site-policy/privacy-policies/github-privacy-statement">GitHub's privacy statement</a>.
+    </p>
+  </section>
+
+  <section class="doc" id="choices">
+    <h2>Your data &amp; your choices</h2>
+    <p>
+      Because we collect nothing, there is nothing for us to access, share, sell, or delete.
+      Everything Sylvester knows lives on your Mac or in your own SnapTrade account, and both
+      are yours to inspect or remove at any time.
+    </p>
+  </section>
+
+  <section class="doc" id="changes">
+    <h2>Changes &amp; contact</h2>
+    <p>
+      If this policy changes, the date at the top changes with it, and the full history is public in the
+      <a href="https://github.com/chang-07/sylvester">project repository</a>. Questions?
+      <a href="https://github.com/chang-07/sylvester/issues">Open an issue on GitHub</a>.
+    </p>
+  </section>
+</main>
+
+<footer>
+  <span>Sylvester — an open-source macOS menubar app.</span>
+  <span>
+    <a href="/">Home</a> ·
+    <a href="https://github.com/chang-07/sylvester">GitHub</a> ·
+    <a href="/privacy">Privacy</a> ·
+    <a href="/terms">Terms</a>
+  </span>
+</footer>
+
+</div>
+</body>
+</html>

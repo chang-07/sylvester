@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sylvester — Terms of Service</title>
+<meta name="description" content="Sylvester is free, open-source software under the MIT License, provided as-is. It displays your brokerage data read-only and is not financial advice." />
+<link rel="icon" type="image/svg+xml" href="assets/sylvester-logo.svg" />
+<meta property="og:title" content="Sylvester — Terms of Service" />
+<meta property="og:description" content="Free and open-source under the MIT License, provided as-is. Read-only, and not financial advice." />
+<meta property="og:type" content="article" />
+<style>
+:root {
+  --paper: #FBF8F2; --paper-2: #F1EBDD; --ink: #17171A; --ink-2: #3B3B42;
+  --muted: #7C766C; --line: #E5DDCC; --card: #FFFFFF;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--sans); color: var(--ink); line-height: 1.6;
+  background: linear-gradient(180deg, var(--paper) 0%, var(--paper-2) 100%); background-attachment: fixed; }
+a { color: inherit; }
+.wrap { max-width: 760px; margin: 0 auto; padding: 0 clamp(20px, 5vw, 48px); }
+.nav { display: flex; align-items: center; justify-content: space-between; padding: 18px 0; }
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.brand img { width: 30px; height: 30px; border-radius: 7px; }
+.brand span { font-weight: 650; font-size: 17px; letter-spacing: -0.015em; }
+.nav a.back { font-size: 14px; color: var(--ink-2); text-decoration: none; }
+.nav a.back:hover { color: var(--ink); }
+.eyebrow { font-size: 12.5px; letter-spacing: .10em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+h1 { font-size: clamp(32px, 5vw, 44px); letter-spacing: -0.03em; margin: 10px 0 14px; }
+.lede { font-size: 17px; color: var(--ink-2); max-width: 58ch; }
+.updated { font-size: 13px; color: var(--muted); margin-top: 14px; }
+.hero { padding: clamp(28px, 5vw, 56px) 0 clamp(20px, 3vw, 36px); }
+section.doc { background: var(--card); border: 1px solid var(--line); border-radius: 13px;
+  padding: clamp(18px, 3vw, 28px); margin-bottom: 18px; }
+section.doc h2 { font-size: 21px; letter-spacing: -0.02em; margin-bottom: 10px; }
+section.doc p { margin-bottom: 10px; color: var(--ink-2); }
+section.doc ul { padding-left: 20px; color: var(--ink-2); }
+section.doc li { margin-bottom: 8px; }
+section.doc code { font-family: var(--mono); font-size: 0.88em; background: var(--paper-2); padding: 1px 5px; border-radius: 5px; }
+section.doc a { text-decoration: underline; text-underline-offset: 2px; }
+footer { padding: 28px 0 44px; font-size: 13.5px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 8px 18px; justify-content: space-between; }
+footer a { color: var(--ink-2); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="nav">
+  <a class="brand" href="/"><img src="assets/sylvester-logo.svg" alt="" /><span>Sylvester</span></a>
+  <a class="back" href="/">← Back to home</a>
+</header>
+
+<main>
+  <section class="hero">
+    <p class="eyebrow">the legal bit</p>
+    <h1>Terms of Service</h1>
+    <p class="lede">
+      Short version: Sylvester is free, open-source software under the MIT License, provided
+      as-is. It shows you your own brokerage data, read-only — it is not financial advice,
+      and it can't touch your money. The details are below.
+    </p>
+    <p class="updated">Last updated · 12 September 2026</p>
+  </section>
+
+  <section class="doc" id="use">
+    <h2>Using Sylvester</h2>
+    <ul>
+      <li><strong>It's free.</strong> No purchase, no subscription, and no Sylvester account.</li>
+      <li><strong>Open source.</strong> The full source is public on <a href="https://github.com/chang-07/sylvester">GitHub</a> — you're welcome to read it, build it, and contribute.</li>
+      <li><strong>Your SnapTrade account is yours.</strong> Sylvester connects to brokerage data through <a href="https://snaptrade.com">SnapTrade</a>; your use of SnapTrade and of your brokerages is governed by their own terms, not these.</li>
+    </ul>
+  </section>
+
+  <section class="doc" id="license">
+    <h2>License</h2>
+    <p>
+      Sylvester's source code is released under the <strong>MIT License</strong>: you're free to
+      use, copy, modify, and distribute it, provided the copyright notice and license text travel
+      with it. The full text lives in the
+      <a href="https://github.com/chang-07/sylvester/blob/main/LICENSE">LICENSE</a> file.
+    </p>
+  </section>
+
+  <section class="doc" id="advice">
+    <h2>Not financial advice</h2>
+    <p>
+      Sylvester displays information from your linked accounts for your own reference. It is not
+      investment, financial, tax, or legal advice, and nothing it shows is a recommendation to buy,
+      sell, or hold anything.
+    </p>
+    <ul>
+      <li><strong>Figures can be delayed or incomplete.</strong> Balances move at your brokerages' sync cadence, quotes and exchange rates come from third-party feeds, and currency conversion is approximate. Verify anything that matters with your brokerage directly.</li>
+      <li><strong>Read-only by construction.</strong> Sylvester's access is scoped so it cannot place trades or move money — but the numbers on screen are a view, not a source of truth.</li>
+    </ul>
+  </section>
+
+  <section class="doc" id="warranty">
+    <h2>No warranty</h2>
+    <p>
+      Sylvester is provided <strong>"as is"</strong>, without warranty of any kind, express or
+      implied — including but not limited to merchantability, fitness for a particular purpose,
+      and non-infringement. You use it at your own risk.
+    </p>
+  </section>
+
+  <section class="doc" id="liability">
+    <h2>Limitation of liability</h2>
+    <p>
+      To the fullest extent permitted by law, the authors and contributors are not liable for any
+      claim, damages, or other liability — including any financial loss or decision made in
+      reliance on displayed data — arising from the use of Sylvester or this website.
+    </p>
+  </section>
+
+  <section class="doc" id="links">
+    <h2>Third-party services</h2>
+    <p>
+      Sylvester relies on services it doesn't control: SnapTrade (account data and sign-in),
+      GitHub (source and downloads), Homebrew (installation), Yahoo Finance (quotes),
+      frankfurter.dev (exchange rates), and Cloudflare (this website). Your use of each is governed
+      by its own terms, and we're not responsible for their content or availability.
+    </p>
+  </section>
+
+  <section class="doc" id="changes">
+    <h2>Changes to these terms</h2>
+    <p>
+      These terms may change over time. The date at the top reflects the latest version, and the
+      full history is public in the
+      <a href="https://github.com/chang-07/sylvester">project repository</a>.
+    </p>
+  </section>
+</main>
+
+<footer>
+  <span>Sylvester — an open-source macOS menubar app.</span>
+  <span>
+    <a href="/">Home</a> ·
+    <a href="https://github.com/chang-07/sylvester">GitHub</a> ·
+    <a href="/privacy">Privacy</a> ·
+    <a href="/terms">Terms</a>
+  </span>
+</footer>
+
+</div>
+</body>
+</html>
